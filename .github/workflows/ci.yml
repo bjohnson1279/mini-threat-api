@@ -1,0 +1,49 @@
+name: CI - Threat Intel API Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: threat_admin
+          POSTGRES_PASSWORD: threat_password123
+          POSTGRES_DB: threat_intel_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U threat_admin -d threat_intel_db"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://threat_admin:threat_password123@localhost:5432/threat_intel_db
+      JWT_SECRET_KEY: ci_test_secret_key_1234567890abcdef
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest -v -s tests/

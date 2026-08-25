@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+threat_intel.db
+.git/
+.gitignore
+*.md
+.env
+.env.example
+tests/
