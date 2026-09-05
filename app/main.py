@@ -3,6 +3,7 @@ from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.database import engine, Base, get_db
 from app.models import Indicator
@@ -15,6 +16,15 @@ from app.seed import seed_threat_data
 async def lifespan(app: FastAPI):
     # Auto-create database tables on startup
     Base.metadata.create_all(bind=engine)
+
+    # ⚡ Bolt Optimization: Ensure index is created on existing tables.
+    # Base.metadata.create_all() does not add missing indices to existing tables.
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_indicators_confidence_score ON indicators (confidence_score)"))
+    except Exception as e:
+        print(f"Could not create index: {e}")
+
     # Seed initial mock threat feed
     db = next(get_db())
     try:
