@@ -28,4 +28,10 @@ class Indicator(Base):
 
     __table_args__ = (
         Index("ix_indicators_type_confidence", "indicator_type", "confidence_score"),
+        # ⚡ Bolt Optimization:
+        # Added dedicated index on confidence_score to speed up /iocs queries
+        # when 'indicator_type' filter is not provided. The previous composite index
+        # couldn't be used effectively without the leftmost prefix.
+        # This reduces query time significantly for those queries.
+        Index("ix_indicators_confidence_score", "confidence_score"),
     )
