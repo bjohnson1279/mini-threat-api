@@ -6,7 +6,7 @@ class Settings(BaseSettings):
         "DATABASE_URL", 
         "sqlite:///./threat_intel.db"
     )
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "dev_secret_threat_intel_key_1234567890abcdef")
+    JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
