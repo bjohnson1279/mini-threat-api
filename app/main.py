@@ -45,8 +45,11 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 @app.get("/health", tags=["System"])
-def health_check():
+async def health_check():
     """Health check endpoint to verify service and container liveness."""
+    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
+    # Since this endpoint does not perform blocking I/O operations (like synchronous DB queries),
+    # using `async def` avoids FastAPI's threadpool context switch overhead, significantly improving throughput.
     return {"status": "healthy", "service": "threat-intel-api"}
 
 @app.post("/auth/token", response_model=Token, tags=["Authentication"])
@@ -156,6 +159,8 @@ def create_ioc(
     return new_ioc
 
 @app.get("/auth/me", response_model=User, tags=["Authentication"])
-def read_current_user_profile(current_user: User = Depends(get_current_user)):
+async def read_current_user_profile(current_user: User = Depends(get_current_user)):
     """Returns the authenticated user identity and claims decoded from the JWT."""
+    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
+    # Using `async def` avoids running this non-blocking endpoint in a threadpool, decreasing overhead.
     return current_user
