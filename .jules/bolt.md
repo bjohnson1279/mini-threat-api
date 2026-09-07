@@ -13,3 +13,7 @@
 - **Zero-Diff Task Termination**: If the requested optimization, refactor, or fix is ALREADY natively present in the target branch, DO NOT create an empty pull request or commit an acknowledgment PR. Exit the task cleanly without opening a PR.
 - **Stale Suggestion Guard**: Always verify the current code on `main`/`master` before planning changes. If no actionable diff is required, cancel task execution immediately.
 
+
+## 2026-09-07 - FastAPI Async vs Sync Endpoints
+**Learning:** In FastAPI, endpoints defined with standard `def` are run in an external threadpool (via `anyio`) to prevent blocking the main event loop. For non-blocking endpoints, this introduces unnecessary thread context-switching overhead.
+**Action:** Declare endpoints that perform no blocking I/O (like simple health checks or those returning decoded JWT claims) as `async def` so they run directly on the event loop. Keep endpoints with blocking I/O (like synchronous SQLAlchemy calls) as synchronous `def` to avoid freezing the event loop.

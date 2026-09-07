@@ -45,7 +45,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 @app.get("/health", tags=["System"])
-def health_check():
+async def health_check():
     """Health check endpoint to verify service and container liveness."""
     return {"status": "healthy", "service": "threat-intel-api"}
 
@@ -156,6 +156,6 @@ def create_ioc(
     return new_ioc
 
 @app.get("/auth/me", response_model=User, tags=["Authentication"])
-def read_current_user_profile(current_user: User = Depends(get_current_user)):
+async def read_current_user_profile(current_user: User = Depends(get_current_user)):
     """Returns the authenticated user identity and claims decoded from the JWT."""
     return current_user
