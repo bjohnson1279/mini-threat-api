@@ -17,3 +17,7 @@
 ## 2026-09-07 - FastAPI Async vs Sync Endpoints
 **Learning:** In FastAPI, endpoints defined with standard `def` are run in an external threadpool (via `anyio`) to prevent blocking the main event loop. For non-blocking endpoints, this introduces unnecessary thread context-switching overhead.
 **Action:** Declare endpoints that perform no blocking I/O (like simple health checks or those returning decoded JWT claims) as `async def` so they run directly on the event loop. Keep endpoints with blocking I/O (like synchronous SQLAlchemy calls) as synchronous `def` to avoid freezing the event loop.
+
+## 2026-09-09 - Optimize SQLAlchemy Existence Checks
+**Learning:** For SQLAlchemy/PostgreSQL database operations, using `db.query(Model).count() == 0` for simple existence checks causes an inefficient O(N) scan across the table.
+**Action:** Prefer `db.query(Model.id).first() is not None` (or `is None`) for an O(1) existence check, especially in application startup or seeding loops, to dramatically improve performance on large tables.

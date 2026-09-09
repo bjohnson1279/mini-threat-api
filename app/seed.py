@@ -76,8 +76,12 @@ SAMPLE_IOCS = [
 
 def seed_threat_data(db: Session):
     """Seeds initial threat intelligence indicators if table is empty."""
-    existing_count = db.query(Indicator).count()
-    if existing_count == 0:
+    # ⚡ Bolt Optimization:
+    # Replaced O(N) db.query(Indicator).count() with O(1) .first() existence check.
+    # .count() causes a full table scan or index scan, while .first() returns instantly
+    # after finding the first row. This dramatically speeds up startup on large DBs.
+    exists = db.query(Indicator.id).first() is not None
+    if not exists:
         for ioc_data in SAMPLE_IOCS:
             ioc = Indicator(**ioc_data)
             db.add(ioc)
