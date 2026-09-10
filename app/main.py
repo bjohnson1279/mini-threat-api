@@ -51,13 +51,18 @@ async def health_check():
     return {"status": "healthy", "service": "threat-intel-api"}
 
 @app.post("/auth/token", response_model=Token, tags=["Authentication"])
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     """
     OAuth2 compatible token login endpoint.
     Accepts standard form-urlencoded credentials (username & password).
     Demo credentials:
       - username: 'analyst', password: 'password123'
       - username: 'admin', password: 'adminpassword123'
+
+    ⚡ Bolt Optimization:
+    Declared as `async def` to run directly on the event loop.
+    This avoids threadpool overhead since the function performs no blocking I/O
+    (e.g., no synchronous DB calls or slow hashing).
     """
     # Dummy hash to equalize response times and prevent username enumeration (Timing Attack)
     dummy_hash = b"$2b$12$90Pokwy39XRxwx/58TU7UuaIdqmVD2lF8RmGjOCXZ.m9DQF/On30m"
