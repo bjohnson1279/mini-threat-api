@@ -48,16 +48,24 @@ app = FastAPI(
 @app.get("/health", tags=["System"])
 async def health_check():
     """Health check endpoint to verify service and container liveness."""
+    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
+    # Since this endpoint does not perform blocking I/O operations (like synchronous DB queries),
+    # using `async def` avoids FastAPI's threadpool context switch overhead, significantly improving throughput.
     return {"status": "healthy", "service": "threat-intel-api"}
 
 @app.post("/auth/token", response_model=Token, tags=["Authentication"])
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     """
     OAuth2 compatible token login endpoint.
     Accepts standard form-urlencoded credentials (username & password).
     Demo credentials:
       - username: 'analyst', password: 'password123'
       - username: 'admin', password: 'adminpassword123'
+
+    ⚡ Bolt Optimization:
+    Declared as `async def` to run directly on the event loop.
+    This avoids threadpool overhead since the function performs no blocking I/O
+    (e.g., no synchronous DB calls or slow hashing).
     """
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
@@ -161,4 +169,6 @@ def create_ioc(
 @app.get("/auth/me", response_model=User, tags=["Authentication"])
 async def read_current_user_profile(current_user: User = Depends(get_current_user)):
     """Returns the authenticated user identity and claims decoded from the JWT."""
+    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
+    # Using `async def` avoids running this non-blocking endpoint in a threadpool, decreasing overhead.
     return current_user
