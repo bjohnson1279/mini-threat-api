@@ -6,7 +6,6 @@ class Settings(BaseSettings):
         "DATABASE_URL", 
         "sqlite:///./threat_intel.db"
     )
-    # SECURITY: Omit hardcoded default to strictly enforce environment variable configuration
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
