@@ -14,13 +14,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 MOCK_USERS_DB = {
     "analyst": {
         "username": "analyst",
-        "password": "password123",  # For demo purposes
+        "hashed_password": "$2b$12$Zru63fBj5b0XRN8jtbQuC.Cl5xexUU/zU9GE/T0CFmO6iHEFABn/K",
         "role": "threat_analyst",
         "disabled": False
     },
     "admin": {
         "username": "admin",
-        "password": "adminpassword123",
+        "hashed_password": "$2b$12$.wiM/HVRnx1NS6OaOjMKF.AYU4rTXHYjXvTXlKu2GCnTlT4X1AqzK",
         "role": "admin",
         "disabled": False
     }
