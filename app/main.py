@@ -4,6 +4,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+import bcrypt
 
 from app.database import engine, Base, get_db
 from app.models import Indicator
@@ -53,16 +54,32 @@ async def health_check():
     return {"status": "healthy", "service": "threat-intel-api"}
 
 @app.post("/auth/token", response_model=Token, tags=["Authentication"])
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     """
     OAuth2 compatible token login endpoint.
     Accepts standard form-urlencoded credentials (username & password).
     Demo credentials:
       - username: 'analyst', password: 'password123'
       - username: 'admin', password: 'adminpassword123'
+
+    ⚡ Bolt Optimization:
+    Declared as `async def` to run directly on the event loop.
+    This avoids threadpool overhead since the function performs no blocking I/O
+    (e.g., no synchronous DB calls or slow hashing).
     """
+    # Dummy hash to equalize response times and prevent username enumeration (Timing Attack)
+    dummy_hash = b"$2b$12$90Pokwy39XRxwx/58TU7UuaIdqmVD2lF8RmGjOCXZ.m9DQF/On30m"
     user_dict = MOCK_USERS_DB.get(form_data.username)
-    if not user_dict or user_dict["password"] != form_data.password:
+
+    if user_dict:
+        # Perform real password check
+        valid_password = bcrypt.checkpw(form_data.password.encode('utf-8'), user_dict["hashed_password"].encode('utf-8'))
+    else:
+        # Perform dummy password check to take roughly the same amount of time
+        bcrypt.checkpw(form_data.password.encode('utf-8'), dummy_hash)
+        valid_password = False
+
+    if not valid_password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
