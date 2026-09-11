@@ -35,6 +35,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check for Merge Conflict Markers
+        run: |
+          echo "Scanning codebase for git merge conflict markers..."
+          if git grep -n -I -E '^(<{7}|={7}|>{7}|\|{7})([[:space:]]|$)'; then
+            echo "::error::Merge conflict markers detected in tracked files! Please resolve conflicts before merging."
+            exit 1
+          fi
+          echo "No conflict markers detected."
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:

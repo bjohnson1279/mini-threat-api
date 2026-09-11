@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from typing import List, Optional
+import bcrypt
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -45,8 +46,11 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 @app.get("/health", tags=["System"])
-def health_check():
+async def health_check():
     """Health check endpoint to verify service and container liveness."""
+    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
+    # Since this endpoint does not perform blocking I/O operations (like synchronous DB queries),
+    # using `async def` avoids FastAPI's threadpool context switch overhead, significantly improving throughput.
     return {"status": "healthy", "service": "threat-intel-api"}
 
 @app.post("/auth/token", response_model=Token, tags=["Authentication"])
@@ -57,9 +61,16 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     Demo credentials:
       - username: 'analyst', password: 'password123'
       - username: 'admin', password: 'adminpassword123'
+
+    ⚡ Bolt Optimization:
+    Declared as `def` to run in a threadpool instead of the event loop.
+    This avoids blocking the main event loop since `bcrypt.checkpw()` is a CPU-bound
+    operation that would otherwise delay all concurrent requests.
     """
     user_dict = MOCK_USERS_DB.get(form_data.username)
-    if not user_dict or user_dict["password"] != form_data.password:
+
+    # Check if user exists and verify password securely
+    if not user_dict or not bcrypt.checkpw(form_data.password.encode('utf-8'), user_dict["password"].encode('utf-8')):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -156,6 +167,8 @@ def create_ioc(
     return new_ioc
 
 @app.get("/auth/me", response_model=User, tags=["Authentication"])
-def read_current_user_profile(current_user: User = Depends(get_current_user)):
+async def read_current_user_profile(current_user: User = Depends(get_current_user)):
     """Returns the authenticated user identity and claims decoded from the JWT."""
+    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
+    # Using `async def` avoids running this non-blocking endpoint in a threadpool, decreasing overhead.
     return current_user
