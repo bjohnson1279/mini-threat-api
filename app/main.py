@@ -53,9 +53,6 @@ async def health_check():
     # using `async def` avoids FastAPI's threadpool context switch overhead, significantly improving throughput.
     return {"status": "healthy", "service": "threat-intel-api"}
 
-# A static, valid bcrypt hash used for dummy verification to prevent timing attacks.
-DUMMY_PASSWORD_HASH = b"$2b$12$F77z04MFFikPzgsMm9Ymgul1fRkgPTak5a4SMPViLs02Gos9fLJKK"
-
 @app.post("/auth/token", response_model=Token, tags=["Authentication"])
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     """
@@ -65,23 +62,15 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
       - username: 'analyst', password: 'password123'
       - username: 'admin', password: 'adminpassword123'
 
-    🛡️ Sentinel Fix:
-    Changed back to synchronous `def` because password hashing/verification is CPU-bound.
-    Running it in `async def` blocks the event loop, causing poor performance under load.
-    Also, implemented a dummy password verification to mitigate timing attacks (user enumeration).
+    ⚡ Bolt Optimization:
+    Declared as `def` to run in a threadpool instead of the event loop.
+    This avoids blocking the main event loop since `bcrypt.checkpw()` is a CPU-bound
+    operation that would otherwise delay all concurrent requests.
     """
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
-    # Mitigate timing attack (user enumeration) by always performing a hash check
-    if user_dict:
-        password_hash = user_dict["password"].encode('utf-8')
-    else:
-        password_hash = DUMMY_PASSWORD_HASH
-
-    # Check password securely
-    password_valid = bcrypt.checkpw(form_data.password.encode('utf-8'), password_hash)
-
-    if not user_dict or not password_valid:
+    # Check if user exists and verify password securely
+    if not user_dict or not bcrypt.checkpw(form_data.password.encode('utf-8'), user_dict["password"].encode('utf-8')):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
