@@ -39,3 +39,8 @@
 ## Hallucinatory Task & Empty PR Directives
 - **Zero-Diff Task Termination**: If the requested optimization, refactor, or fix is ALREADY natively present in the target branch, DO NOT create an empty pull request or commit an acknowledgment PR. Exit the task cleanly without opening a PR.
 - **Stale Suggestion Guard**: Always verify the current code on `main`/`master` before planning changes. If no actionable diff is required, cancel task execution immediately.
+
+## 2024-05-24 - Authorization Bypass in Threat Intel Ingestion
+**Vulnerability:** The `POST /iocs` endpoint only validated that a user was authenticated (via `get_current_user`), but failed to enforce Role-Based Access Control (RBAC). Any authenticated user, including read-only users or guests, could ingest new threat intelligence indicators into the database.
+**Learning:** In FastAPI, depending on an authentication function ensures identity but not authorization. A dedicated authorizer dependency (like `require_role`) is necessary for endpoints that modify state or sensitive data.
+**Prevention:** Always verify endpoint dependencies for write operations. Use `Depends(require_role("role_name"))` instead of `Depends(get_current_user)` when restricting access based on privileges. Ensure unit tests validate that lower-privileged users receive a 403 Forbidden response for administrative actions.
