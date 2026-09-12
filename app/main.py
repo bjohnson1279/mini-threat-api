@@ -69,8 +69,20 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     """
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
+    # 🛡️ Sentinel Security Fix:
+    # Always perform a bcrypt check to prevent timing attacks for user enumeration.
+    # If the user doesn't exist, we check the password against a dummy hash so it
+    # takes roughly the same amount of time as checking a real user's password.
+    # Dummy hash uses a static pre-computed bcrypt hash string.
+    dummy_hash = b"$2b$12$v1B3NFjxLnulAxo8hmmE8.wX7DP7pExSaVPCDr74ERGYQm3lkjqc6"
+
+    user_exists = user_dict is not None
+    hash_to_check = user_dict["password"].encode('utf-8') if user_exists else dummy_hash
+
+    password_matches = bcrypt.checkpw(form_data.password.encode('utf-8'), hash_to_check)
+
     # Check if user exists and verify password securely
-    if not user_dict or not bcrypt.checkpw(form_data.password.encode('utf-8'), user_dict["password"].encode('utf-8')):
+    if not user_exists or not password_matches:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
