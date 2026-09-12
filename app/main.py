@@ -136,7 +136,10 @@ def get_ioc_by_id(
     current_user: User = Depends(get_current_user)
 ):
     """Retrieves a single threat indicator by its database primary key."""
-    indicator = db.query(Indicator).filter(Indicator.id == ioc_id).first()
+    # ⚡ Bolt Optimization: Replace db.query(Model).filter(Model.id == id).first() with db.get(Model, id)
+    # Using db.get() avoids the overhead of compiling a filter expression and will return
+    # instantly from the SQLAlchemy Identity Map if the object is already loaded, avoiding a DB query entirely.
+    indicator = db.get(Indicator, ioc_id)
     if not indicator:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
