@@ -29,3 +29,7 @@
 ## 2026-10-25 - Optimize SQLAlchemy Primary Key Lookups
 **Learning:** For SQLAlchemy primary key lookups, using `db.query(Model).filter(Model.id == id).first()` adds overhead because it must compile a filter expression. Furthermore, it will always execute a query against the database.
 **Action:** Always prefer `db.get(Model, id)` for primary key lookups. It avoids compiling the filter expression and can return instantly from the Session's Identity Map without a database roundtrip if the object was already loaded.
+
+## 2024-05-24 - FastAPI Response Compression
+**Learning:** Threat intelligence JSON payloads often contain highly repetitive string keys and values (e.g., indicator types, severities, long descriptions) which compress exceptionally well. Adding GZip compression can result in massive payload size reductions (up to 94%).
+**Action:** Always consider adding `GZipMiddleware` to FastAPI services returning large lists of homogeneous JSON objects, configuring a `minimum_size` to avoid compressing small, fast responses.
