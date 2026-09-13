@@ -29,3 +29,7 @@
 ## 2026-10-25 - Optimize SQLAlchemy Primary Key Lookups
 **Learning:** For SQLAlchemy primary key lookups, using `db.query(Model).filter(Model.id == id).first()` adds overhead because it must compile a filter expression. Furthermore, it will always execute a query against the database.
 **Action:** Always prefer `db.get(Model, id)` for primary key lookups. It avoids compiling the filter expression and can return instantly from the Session's Identity Map without a database roundtrip if the object was already loaded.
+
+## 2024-05-15 - FastAPI GZipMiddleware Optimization
+**Learning:** For endpoints returning large, repetitive JSON payloads like Threat Intel IOC lists, the uncompressed data can become a network bottleneck.
+**Action:** Apply `GZipMiddleware` to compress API responses. This significantly reduces network bandwidth and transit time for clients parsing large datasets. Because the FastAPI `TestClient` (via `httpx`) natively handles gzip, this optimization can often be added safely without breaking existing client expectations.
