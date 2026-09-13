@@ -111,6 +111,22 @@ def test_full_threat_intel_lifecycle():
         assert invalid_resp.status_code == 422  # Unprocessable Entity
         print("[+] Pydantic runtime validation successfully rejected out-of-range confidence_score with 422.")
 
+        # 13. Ensure RBAC authorization is enforced on POST /iocs
+        # Login as a guest (does not have "threat_analyst" or "admin" role)
+        guest_login = client.post(
+            "/auth/token",
+            data={"username": "guest", "password": "password123"}  # password for dummy hash is 'password123'
+        )
+        assert guest_login.status_code == 200
+        guest_token = guest_login.json()["access_token"]
+        guest_headers = {"Authorization": f"Bearer {guest_token}"}
+
+        # Attempt to create IOC as guest
+        guest_create_resp = client.post("/iocs", json=new_ioc_payload, headers=guest_headers)
+        assert guest_create_resp.status_code == 403
+        assert "Operation not permitted" in guest_create_resp.json().get("detail", "")
+        print("[+] RBAC authorization correctly prevented unauthorized IOC creation with 403.")
+
         print("\n[SUCCESS] ALL THREAT INTEL API TESTS PASSED!\n")
 
 if __name__ == "__main__":
