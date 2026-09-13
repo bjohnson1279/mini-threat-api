@@ -25,6 +25,13 @@ MOCK_USERS_DB = {
         "password": "$2b$12$Sat01mrSqG5qVzQZpjfhtOlQ90fZ8EqxNbVdW4z4V3vxHnX1SOdVu",
         "role": "admin",
         "disabled": False
+    },
+    "guest": {
+        "username": "guest",
+        # bcrypt hash of 'password123'
+        "password": "$2b$12$v1B3NFjxLnulAxo8hmmE8.wX7DP7pExSaVPCDr74ERGYQm3lkjqc6",
+        "role": "guest",
+        "disabled": False
     }
 }
 
