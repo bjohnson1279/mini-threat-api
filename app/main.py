@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import List, Optional
 import bcrypt
 from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -40,6 +41,11 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# ⚡ Bolt Optimization: Add GZipMiddleware to compress large JSON responses
+# Threat-intel responses can be quite large and repetitive. GZipMiddleware
+# significantly reduces network bandwidth and transit time for large payloads.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # ---------------------------------------------------------------------------
 # Unauthenticated Routes
