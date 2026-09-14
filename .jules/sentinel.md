@@ -39,3 +39,8 @@
 ## Hallucinatory Task & Empty PR Directives
 - **Zero-Diff Task Termination**: If the requested optimization, refactor, or fix is ALREADY natively present in the target branch, DO NOT create an empty pull request or commit an acknowledgment PR. Exit the task cleanly without opening a PR.
 - **Stale Suggestion Guard**: Always verify the current code on `main`/`master` before planning changes. If no actionable diff is required, cancel task execution immediately.
+
+## 2024-05-24 - Missing Authorization on State-Modifying Endpoint
+**Vulnerability:** The `POST /iocs` endpoint used `get_current_user`, which validates identity (authentication) but not permissions (authorization). Any valid user, including a guest, could ingest threat indicators.
+**Learning:** Authentication dependencies like `Depends(get_current_user)` only prove *who* the user is, not *what* they are allowed to do. State-modifying endpoints must explicitly check roles.
+**Prevention:** Always enforce Role-Based Access Control (RBAC) (e.g., using `require_role`) on endpoints that create, modify, or delete sensitive data or modify state, to prevent authorization bypass.

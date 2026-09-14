@@ -9,7 +9,7 @@ from sqlalchemy import text
 from app.database import engine, Base, get_db
 from app.models import Indicator
 from app.schemas import IOCResponse, IOCCreate, Token, User
-from app.auth import create_access_token, get_current_user, MOCK_USERS_DB
+from app.auth import create_access_token, get_current_user, require_role, MOCK_USERS_DB
 from app.seed import seed_threat_data
 
 # Lifespan context: replaces deprecated @app.on_event("startup") in modern FastAPI
@@ -169,7 +169,7 @@ def get_ioc_by_id(
 def create_ioc(
     ioc_in: IOCCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role("threat_analyst"))
 ):
     """
     Ingests a new IOC record into the threat database.
