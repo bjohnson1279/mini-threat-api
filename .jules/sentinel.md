@@ -44,3 +44,8 @@
 **Vulnerability:** The `POST /iocs` endpoint used `get_current_user`, which validates identity (authentication) but not permissions (authorization). Any valid user, including a guest, could ingest threat indicators.
 **Learning:** Authentication dependencies like `Depends(get_current_user)` only prove *who* the user is, not *what* they are allowed to do. State-modifying endpoints must explicitly check roles.
 **Prevention:** Always enforce Role-Based Access Control (RBAC) (e.g., using `require_role`) on endpoints that create, modify, or delete sensitive data or modify state, to prevent authorization bypass.
+
+## 2024-09-15 - bcrypt DoS via Maximum Password Length
+**Vulnerability:** The `/auth/token` endpoint passed raw user passwords directly to `bcrypt.checkpw()`. If a password exceeded 72 bytes, the `bcrypt` library threw a `ValueError`, resulting in a 500 Internal Server Error (Denial of Service).
+**Learning:** The Python `bcrypt` library enforces a strict 72-byte limit on passwords. Unhandled, this allows attackers to trivially crash or exhaust server resources by submitting overly long passwords.
+**Prevention:** Always check password length before passing to `bcrypt.checkpw()`. For passwords > 72 bytes, handle them gracefully (e.g., truncate and force an authentication failure) to prevent exceptions while maintaining constant-time execution to avoid timing attacks.
