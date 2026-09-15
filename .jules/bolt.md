@@ -33,3 +33,6 @@
 ## 2024-05-15 - FastAPI GZipMiddleware Optimization
 **Learning:** For endpoints returning large, repetitive JSON payloads like Threat Intel IOC lists, the uncompressed data can become a network bottleneck.
 **Action:** Apply `GZipMiddleware` to compress API responses. This significantly reduces network bandwidth and transit time for clients parsing large datasets. Because the FastAPI `TestClient` (via `httpx`) natively handles gzip, this optimization can often be added safely without breaking existing client expectations.
+## 2024-05-24 - Avoid Threadpool Overhead in FastAPI Dependencies
+**Learning:** Synchronous dependency functions (`def`) in FastAPI are executed in a threadpool to prevent blocking the event loop. This causes unnecessary context switching and thread contention for simple, non-blocking operations like string comparisons (e.g., in `role_checker`).
+**Action:** Always use `async def` for non-blocking dependency functions to run them directly in the event loop, avoiding threadpool overhead and improving performance.

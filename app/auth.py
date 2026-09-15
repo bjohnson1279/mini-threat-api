@@ -86,7 +86,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 
 def require_role(required_role: str):
     """Role-based access control (RBAC) dependency factory."""
-    def role_checker(current_user: User = Depends(get_current_user)):
+    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
+    # Using `async def` avoids running this non-blocking endpoint in a threadpool, decreasing overhead.
+    async def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role != required_role and current_user.role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
