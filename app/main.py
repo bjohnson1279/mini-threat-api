@@ -85,7 +85,16 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user_exists = user_dict is not None
     hash_to_check = user_dict["password"].encode('utf-8') if user_exists else dummy_hash
 
-    password_matches = bcrypt.checkpw(form_data.password.encode('utf-8'), hash_to_check)
+    password_bytes = form_data.password.encode('utf-8')
+
+    # 🛡️ Sentinel Security Fix:
+    # Prevent DoS (ValueError) from bcrypt if password exceeds 72 bytes.
+    # We still perform the check with a truncated password to maintain constant time.
+    if len(password_bytes) > 72:
+        bcrypt.checkpw(password_bytes[:72], hash_to_check)
+        password_matches = False
+    else:
+        password_matches = bcrypt.checkpw(password_bytes, hash_to_check)
 
     # Check if user exists and verify password securely
     if not user_exists or not password_matches:
