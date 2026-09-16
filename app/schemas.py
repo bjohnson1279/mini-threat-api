@@ -8,12 +8,12 @@ SeverityEnum = Literal["low", "medium", "high", "critical"]
 
 class IOCBase(BaseModel):
     """Base Pydantic schema with shared threat indicator attributes."""
-    indicator_value: str = Field(..., json_schema_extra={"example": "198.51.100.24"}, description="The observable IP, domain, or hash")
+    indicator_value: str = Field(..., max_length=255, json_schema_extra={"example": "198.51.100.24"}, description="The observable IP, domain, or hash")
     indicator_type: IndicatorTypeEnum = Field(..., json_schema_extra={"example": "ipv4"}, description="Classification of the IOC")
-    threat_type: str = Field(..., json_schema_extra={"example": "ransomware_c2"}, description="Category of malicious activity")
+    threat_type: str = Field(..., max_length=100, json_schema_extra={"example": "ransomware_c2"}, description="Category of malicious activity")
     confidence_score: int = Field(default=50, ge=0, le=100, json_schema_extra={"example": 85}, description="Confidence score from 0 to 100")
     severity: SeverityEnum = Field(default="medium", json_schema_extra={"example": "high"}, description="Assessed severity level")
-    description: Optional[str] = Field(None, json_schema_extra={"example": "Associated with BlackCat ransomware campaign"})
+    description: Optional[str] = Field(None, max_length=500, json_schema_extra={"example": "Associated with BlackCat ransomware campaign"})
     is_active: bool = Field(default=True, description="Whether indicator is currently active")
 
 class IOCCreate(IOCBase):

@@ -49,3 +49,8 @@
 **Vulnerability:** The `/auth/token` endpoint passed raw user passwords directly to `bcrypt.checkpw()`. If a password exceeded 72 bytes, the `bcrypt` library threw a `ValueError`, resulting in a 500 Internal Server Error (Denial of Service).
 **Learning:** The Python `bcrypt` library enforces a strict 72-byte limit on passwords. Unhandled, this allows attackers to trivially crash or exhaust server resources by submitting overly long passwords.
 **Prevention:** Always check password length before passing to `bcrypt.checkpw()`. For passwords > 72 bytes, handle them gracefully (e.g., truncate and force an authentication failure) to prevent exceptions while maintaining constant-time execution to avoid timing attacks.
+
+## 2024-05-24 - Missing Input Length Limits
+**Vulnerability:** The `IOCBase` schema in `app/schemas.py` lacked `max_length` constraints on string fields like `indicator_value`, `threat_type`, and `description`, which have strict length limits in the database (e.g. `String(255)`). An attacker could send massive payloads, bypassing application-level validation and causing the underlying database driver (like PostgreSQL) to throw fatal `DataError` exceptions, leading to unhandled 500 Internal Server Errors and potential Denial of Service.
+**Learning:** Pydantic validation must match or be stricter than database schema limits to ensure that invalid payloads are cleanly rejected at the application edge (returning 422 Unprocessable Entity) before consuming database resources or causing crashes.
+**Prevention:** Always define `max_length` constraints on string fields in Pydantic schemas corresponding to the maximum column lengths defined in SQLAlchemy models.

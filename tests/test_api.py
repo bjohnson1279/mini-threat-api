@@ -111,7 +111,24 @@ def test_full_threat_intel_lifecycle():
         assert invalid_resp.status_code == 422  # Unprocessable Entity
         print("[+] Pydantic runtime validation successfully rejected out-of-range confidence_score with 422.")
 
-        # 13. Ensure RBAC authorization is enforced on POST /iocs
+        # 13. Pydantic Runtime Validation: reject excessive string lengths (DoS/DB error prevention)
+        long_payload = new_ioc_payload.copy()
+        long_payload["indicator_value"] = "A" * 256  # Invalid: schema enforces max_length=255
+        long_resp = client.post("/iocs", json=long_payload, headers=headers)
+        assert long_resp.status_code == 422
+
+        long_payload2 = new_ioc_payload.copy()
+        long_payload2["threat_type"] = "B" * 101 # Invalid: schema enforces max_length=100
+        long_resp2 = client.post("/iocs", json=long_payload2, headers=headers)
+        assert long_resp2.status_code == 422
+
+        long_payload3 = new_ioc_payload.copy()
+        long_payload3["description"] = "C" * 501 # Invalid: schema enforces max_length=500
+        long_resp3 = client.post("/iocs", json=long_payload3, headers=headers)
+        assert long_resp3.status_code == 422
+        print("[+] Pydantic runtime validation successfully rejected excessive string lengths with 422.")
+
+        # 14. Ensure RBAC authorization is enforced on POST /iocs
         # Login as a guest (does not have "threat_analyst" or "admin" role)
         guest_login = client.post(
             "/auth/token",
