@@ -56,3 +56,4 @@ fix_*.php
 update_*.php
 scratch_*
 *.scratch
+venv2/
