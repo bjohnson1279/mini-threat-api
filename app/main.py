@@ -136,7 +136,11 @@ def list_iocs(
     - SQLAlchemy query filtering and execution
     - Pydantic serialization (`response_model=List[IOCResponse]`)
     """
-    query = db.query(Indicator).filter(Indicator.confidence_score >= min_confidence)
+    # ⚡ Bolt Optimization: Skip redundant filter evaluation when min_confidence is 0 (default).
+    # Since confidence scores are inherently >= 0, adding the WHERE clause for 0 causes unnecessary evaluation.
+    query = db.query(Indicator)
+    if min_confidence > 0:
+        query = query.filter(Indicator.confidence_score >= min_confidence)
     
     if indicator_type:
         query = query.filter(Indicator.indicator_type == indicator_type.lower())

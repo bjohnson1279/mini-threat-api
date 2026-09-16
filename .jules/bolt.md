@@ -36,3 +36,7 @@
 ## 2024-05-24 - Avoid Threadpool Overhead in FastAPI Dependencies
 **Learning:** Synchronous dependency functions (`def`) in FastAPI are executed in a threadpool to prevent blocking the event loop. This causes unnecessary context switching and thread contention for simple, non-blocking operations like string comparisons (e.g., in `role_checker`).
 **Action:** Always use `async def` for non-blocking dependency functions to run them directly in the event loop, avoiding threadpool overhead and improving performance.
+
+## 2024-06-25 - Skip Redundant SQLAlchemy Filters for Default Values
+**Learning:** Adding filters like `Indicator.confidence_score >= min_confidence` where `min_confidence` defaults to `0` (and the column is strictly `>= 0`) forces the database to evaluate an unnecessary condition (`WHERE confidence_score >= 0`). This can add a slight overhead when processing default queries without user-provided filters.
+**Action:** When a filter is functionally a no-op due to boundary conditions and default parameter values, conditionally omit it from the SQLAlchemy query builder (`if min_confidence > 0: query = query.filter(...)`) to ensure the generated SQL remains as optimal as possible for the default/unfiltered path.
