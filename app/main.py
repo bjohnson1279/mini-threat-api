@@ -82,7 +82,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     # Dummy hash uses a static pre-computed bcrypt hash string.
     dummy_hash = b"$2b$12$v1B3NFjxLnulAxo8hmmE8.wX7DP7pExSaVPCDr74ERGYQm3lkjqc6"
 
-    user_exists = user_dict is not None
+    user_exists = user_dict is not None and not user_dict.get("disabled", False)
     hash_to_check = user_dict["password"].encode('utf-8') if user_exists else dummy_hash
 
     password_bytes = form_data.password.encode('utf-8')
