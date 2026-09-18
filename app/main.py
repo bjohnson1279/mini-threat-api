@@ -120,9 +120,9 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     summary="Query Threat Intelligence Indicators"
 )
 def list_iocs(
-    indicator_type: Optional[str] = Query(None, description="Filter by type (ipv4, domain, sha256, url)"),
+    indicator_type: Optional[str] = Query(None, max_length=50, description="Filter by type (ipv4, domain, sha256, url)"),
     min_confidence: Optional[int] = Query(0, ge=0, le=100, description="Minimum confidence score threshold (0-100)"),
-    search: Optional[str] = Query(None, description="Partial search within indicator value or description"),
+    search: Optional[str] = Query(None, max_length=255, description="Partial search within indicator value or description"),
     limit: int = Query(50, ge=1, le=500, description="Maximum records to return"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -146,10 +146,15 @@ def list_iocs(
         query = query.filter(Indicator.indicator_type == indicator_type.lower())
     
     if search:
-        search_pattern = f"%{search}%"
+        # 🛡️ Sentinel Security Fix:
+        # Prevent SQL LIKE Wildcard Injection (Denial of Service) by escaping wildcards,
+        # which otherwise allows attackers to submit overly complex wildcard patterns
+        # that consume excessive database CPU resources.
+        escaped_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        search_pattern = f"%{escaped_search}%"
         query = query.filter(
-            (Indicator.indicator_value.ilike(search_pattern)) | 
-            (Indicator.description.ilike(search_pattern))
+            (Indicator.indicator_value.ilike(search_pattern, escape="\\")) |
+            (Indicator.description.ilike(search_pattern, escape="\\"))
         )
         
     indicators = query.order_by(Indicator.confidence_score.desc()).limit(limit).all()
