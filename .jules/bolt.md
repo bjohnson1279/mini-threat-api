@@ -40,3 +40,7 @@
 ## 2024-06-25 - Skip Redundant SQLAlchemy Filters for Default Values
 **Learning:** Adding filters like `Indicator.confidence_score >= min_confidence` where `min_confidence` defaults to `0` (and the column is strictly `>= 0`) forces the database to evaluate an unnecessary condition (`WHERE confidence_score >= 0`). This can add a slight overhead when processing default queries without user-provided filters.
 **Action:** When a filter is functionally a no-op due to boundary conditions and default parameter values, conditionally omit it from the SQLAlchemy query builder (`if min_confidence > 0: query = query.filter(...)`) to ensure the generated SQL remains as optimal as possible for the default/unfiltered path.
+
+## 2026-10-31 - Redundant Primary Key Indexes in SQLAlchemy
+**Learning:** `primary_key=True` on a SQLAlchemy Column automatically ensures a unique index is created at the database level (in Postgres, SQLite, MySQL, etc). Explicitly adding `index=True` on the same primary key column creates a second, completely redundant B-tree index. This forces the database to maintain two identical indexes for the same column, wasting storage and unnecessarily degrading the performance of `INSERT`, `UPDATE`, and `DELETE` operations.
+**Action:** Never use `index=True` on a column that is already marked as `primary_key=True`. Remove redundant explicit indexes on primary keys to improve write performance and reduce database size.

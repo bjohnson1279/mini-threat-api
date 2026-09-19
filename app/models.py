@@ -15,7 +15,11 @@ class Indicator(Base):
     """
     __tablename__ = "indicators"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    # ⚡ Bolt Optimization: Removed redundant `index=True` from primary key
+    # `primary_key=True` automatically creates a unique B-tree index in relational DBs.
+    # Adding `index=True` explicitly creates a second, completely redundant index on the
+    # same column, which wastes storage and degrades INSERT/UPDATE performance.
+    id = Column(Integer, primary_key=True, autoincrement=True)
     indicator_value = Column(String(255), nullable=False, index=True)  # e.g. IP, domain, hash
     indicator_type = Column(String(50), nullable=False, index=True)    # ipv4, domain, sha256, url
     threat_type = Column(String(100), nullable=False)                  # c2_server, phishing, ransomware
