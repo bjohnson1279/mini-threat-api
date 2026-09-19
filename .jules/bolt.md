@@ -44,3 +44,7 @@
 ## 2026-10-31 - Redundant Primary Key Indexes in SQLAlchemy
 **Learning:** `primary_key=True` on a SQLAlchemy Column automatically ensures a unique index is created at the database level (in Postgres, SQLite, MySQL, etc). Explicitly adding `index=True` on the same primary key column creates a second, completely redundant B-tree index. This forces the database to maintain two identical indexes for the same column, wasting storage and unnecessarily degrading the performance of `INSERT`, `UPDATE`, and `DELETE` operations.
 **Action:** Never use `index=True` on a column that is already marked as `primary_key=True`. Remove redundant explicit indexes on primary keys to improve write performance and reduce database size.
+
+## 2024-05-18 - Remove Redundant Database Indexes
+**Learning:** B-tree indexes on low-cardinality boolean columns and standalone indexes on columns that serve as the leftmost prefix of a composite index are redundant and degrade write performance.
+**Action:** Remove these redundant indexes to save space and improve write speed.
