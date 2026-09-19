@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
+import time
 from typing import List, Optional
 import bcrypt
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -51,6 +52,10 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Unauthenticated Routes
 # ---------------------------------------------------------------------------
 
+LOGIN_ATTEMPTS = {}
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_RATE_LIMIT_WINDOW = 60
+
 @app.get("/health", tags=["System"])
 async def health_check():
     """Health check endpoint to verify service and container liveness."""
@@ -60,7 +65,7 @@ async def health_check():
     return {"status": "healthy", "service": "threat-intel-api"}
 
 @app.post("/auth/token", response_model=Token, tags=["Authentication"])
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     """
     OAuth2 compatible token login endpoint.
     Accepts standard form-urlencoded credentials (username & password).
@@ -73,6 +78,23 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     This avoids blocking the main event loop since `bcrypt.checkpw()` is a CPU-bound
     operation that would otherwise delay all concurrent requests.
     """
+    # 🛡️ Sentinel Security Fix:
+    # Add rate limiting to prevent brute-force attacks and CPU exhaustion (DoS)
+    # due to bcrypt's high computational cost.
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+
+    attempts = LOGIN_ATTEMPTS.get(client_ip, [])
+    attempts = [t for t in attempts if now - t < LOGIN_RATE_LIMIT_WINDOW]
+    if len(attempts) >= MAX_LOGIN_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later."
+        )
+
+    attempts.append(now)
+    LOGIN_ATTEMPTS[client_ip] = attempts
+
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
     # 🛡️ Sentinel Security Fix:
