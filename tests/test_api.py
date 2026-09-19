@@ -31,6 +31,27 @@ def test_full_threat_intel_lifecycle():
         assert bad_auth.status_code == 401
         print("[+] Invalid login rejected with 401.")
 
+        # 3.5 Rate limiting on login attempts
+        # The previous bad auth counts as 1 attempt. We'll make 4 more bad attempts
+        # to reach the MAX_LOGIN_ATTEMPTS = 5 limit.
+        for _ in range(4):
+            client.post(
+                "/auth/token",
+                data={"username": "analyst", "password": "wrongpassword"}
+            )
+
+        # The 6th attempt should be rate limited (429)
+        rate_limited_auth = client.post(
+            "/auth/token",
+            data={"username": "analyst", "password": "wrongpassword"}
+        )
+        assert rate_limited_auth.status_code == 429
+        print("[+] Login rate limiting successfully blocked excess requests with 429.")
+
+        # Reset the global limit for the test client IP to continue testing
+        from app.main import LOGIN_ATTEMPTS
+        LOGIN_ATTEMPTS.clear()
+
         # 4. Valid authentication & JWT issuance
         login_resp = client.post(
             "/auth/token",
