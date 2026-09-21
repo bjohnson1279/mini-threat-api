@@ -69,3 +69,8 @@
 **Vulnerability:** The `/auth/token` endpoint was vulnerable to brute-force credential stuffing and DoS attacks due to a lack of rate limiting. An attacker could rapidly guess passwords or exhaust server resources because it is a CPU-bound endpoint checking bcrypt hashes.
 **Learning:** Endpoints that perform computationally expensive tasks (like bcrypt validation) or authentication must always be rate-limited, as they amplify the effect of unauthenticated DoS traffic and allow for rapid brute-forcing.
 **Prevention:** Implement IP-based or user-based rate limiting on sensitive routes. For simple applications without Redis, a lightweight in-memory dictionary bounded by time (and optimally cleaned up) can provide effective basic protection against brute force and DoS.
+
+## 2026-09-21 - [Security Headers for API Defense]
+**Vulnerability:** The FastAPI application was missing standard security HTTP headers (like `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`), leaving it potentially vulnerable to MIME-sniffing, clickjacking (on browser-rendered parts like Swagger UI), and lacking forced HTTPS enforcement for consumers.
+**Learning:** Even for pure APIs, setting security headers provides defense-in-depth, especially when hosting auto-generated API documentation UIs (like Swagger/ReDoc) that are rendered in web browsers.
+**Prevention:** Always implement a global middleware to enforce standard security headers on all HTTP responses, ensuring browsers enforce strict security policies regardless of the endpoint accessed.
