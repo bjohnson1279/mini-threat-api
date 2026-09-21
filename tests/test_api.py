@@ -144,6 +144,21 @@ def test_full_threat_intel_lifecycle():
         assert "Operation not permitted" in guest_create_resp.json().get("detail", "")
         print("[+] RBAC authorization correctly prevented unauthorized IOC creation with 403.")
 
+        # 15. Verify brute force rate limiting
+        for _ in range(5):
+            res = client.post(
+                "/auth/token",
+                data={"username": "analyst", "password": "wrongpassword_rate_limit"}
+            )
+            assert res.status_code in [200, 401, 429]
+
+        rl_res = client.post(
+            "/auth/token",
+            data={"username": "analyst", "password": "wrongpassword_rate_limit"}
+        )
+        assert rl_res.status_code == 429
+        print("[+] Login endpoint rate limiting DoS protection works.")
+
         print("\n[SUCCESS] ALL THREAT INTEL API TESTS PASSED!\n")
 
 if __name__ == "__main__":
