@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import List, Optional
 import time
 import bcrypt
-from fastapi import FastAPI, Depends, HTTPException, Query, status, Request
+from fastapi import FastAPI, Depends, HTTPException, Query, Path, status, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -197,7 +197,7 @@ def list_iocs(
     summary="Get Indicator by ID"
 )
 def get_ioc_by_id(
-    ioc_id: int,
+    ioc_id: int = Path(..., le=2147483647),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
