@@ -159,6 +159,11 @@ def test_full_threat_intel_lifecycle():
         assert rl_res.status_code == 429
         print("[+] Login endpoint rate limiting DoS protection works.")
 
+        # 16. Integer Overflow DoS Prevention
+        overflow_resp = client.get("/iocs/9999999999", headers=headers)
+        assert overflow_resp.status_code == 422
+        print("[+] Prevented Integer Overflow DoS with 422.")
+
         print("\n[SUCCESS] ALL THREAT INTEL API TESTS PASSED!\n")
 
 if __name__ == "__main__":
