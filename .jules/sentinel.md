@@ -74,3 +74,8 @@
 **Vulnerability:** The FastAPI application was missing standard security HTTP headers (like `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`), leaving it potentially vulnerable to MIME-sniffing, clickjacking (on browser-rendered parts like Swagger UI), and lacking forced HTTPS enforcement for consumers.
 **Learning:** Even for pure APIs, setting security headers provides defense-in-depth, especially when hosting auto-generated API documentation UIs (like Swagger/ReDoc) that are rendered in web browsers.
 **Prevention:** Always implement a global middleware to enforce standard security headers on all HTTP responses, ensuring browsers enforce strict security policies regardless of the endpoint accessed.
+
+## 2024-10-24 - Integer Overflow DoS via Unbounded Path Parameter
+**Vulnerability:** The `/iocs/{ioc_id}` endpoint took an integer path parameter without size validation. Submitting a significantly large integer caused an `OverflowError` (in SQLite) or `DataError` (in PostgreSQL) when the database driver attempted to convert the Python integer to a database native integer, resulting in a 500 Internal Server Error (Denial of Service).
+**Learning:** Pydantic validation (including FastAPI `Path` and `Query` arguments) must account for underlying database data types and their intrinsic limits (e.g., standard SQL 32-bit integers cap at 2,147,483,647). An unbound numeric endpoint variable allows trivial application crashes.
+**Prevention:** Always enforce strict `le` (less than or equal to) or `lt` limits via Pydantic `Field` or FastAPI `Path` corresponding to the underlying database column types (e.g. `le=2147483647` for standard 32-bit signed integers) to fail early and securely with a 422 Unprocessable Entity.
