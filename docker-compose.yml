@@ -20,7 +20,7 @@ services:
     container_name: threat_intel_api
     restart: always
     environment:
-      - DATABASE_URL=postgresql://threat_admin:threat_password123@db:5432/threat_intel_db
+      - DATABASE_URL=postgresql+psycopg2://threat_admin:threat_password123@db:5432/threat_intel_db
       - JWT_SECRET_KEY=dev_secret_threat_intel_key_1234567890abcdef
       - JWT_ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=60
