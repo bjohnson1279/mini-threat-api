@@ -20,10 +20,7 @@ class Indicator(Base):
     # Adding `index=True` explicitly creates a second, completely redundant index on the
     # same column, which wastes storage and degrades INSERT/UPDATE performance.
     id = Column(Integer, primary_key=True, autoincrement=True)
-    # ⚡ Bolt Optimization: Removed redundant `index=True` from `indicator_value`
-    # The column is exclusively searched using leading-wildcard queries (ILIKE '%search%').
-    # Standard B-tree indexes cannot optimize these searches and only degrade write performance.
-    indicator_value = Column(String(255), nullable=False)              # e.g. IP, domain, hash
+    indicator_value = Column(String(255), nullable=False, index=True)  # e.g. IP, domain, hash
     # ⚡ Bolt Optimization: Removed redundant `index=True` from `indicator_type` and `is_active`
     # `indicator_type` already serves as the leftmost prefix of `ix_indicators_type_confidence`.
     # `is_active` is a low-cardinality boolean column. Standalone indexes for these degrade write performance.
