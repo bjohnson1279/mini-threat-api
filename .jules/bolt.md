@@ -48,3 +48,7 @@
 ## 2024-08-16 - Redundant Indexes on Low-Cardinality and Composite Prefix Columns
 **Learning:** Adding `index=True` to low-cardinality boolean columns (like `is_active`) or columns that already serve as the leftmost prefix of a composite index (like `indicator_type` in `ix_indicators_type_confidence`) creates redundant, standalone indexes. These indexes waste database storage and unnecessarily degrade write (INSERT/UPDATE/DELETE) performance without providing any query performance benefit.
 **Action:** Never add `index=True` to columns that have low cardinality (e.g. boolean fields that aren't exclusively queried) or columns that are already the leftmost prefix of a composite index. Always remove these redundant indexes to optimize write operations and save storage.
+
+## 2024-03-24 - SQLAlchemy B-tree Indexes and Leading-Wildcard Queries
+**Learning:** In SQLAlchemy, applying `index=True` to columns exclusively searched using leading-wildcard queries (e.g., `ILIKE '%search%'`) creates a standard B-tree index that cannot optimize these searches and only degrades write performance.
+**Action:** Never add `index=True` to columns that are only queried with leading wildcards. Remove these redundant indexes to optimize database writes and save storage.
