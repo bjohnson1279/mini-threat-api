@@ -74,3 +74,7 @@
 **Vulnerability:** The FastAPI application was missing standard security HTTP headers (like `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`), leaving it potentially vulnerable to MIME-sniffing, clickjacking (on browser-rendered parts like Swagger UI), and lacking forced HTTPS enforcement for consumers.
 **Learning:** Even for pure APIs, setting security headers provides defense-in-depth, especially when hosting auto-generated API documentation UIs (like Swagger/ReDoc) that are rendered in web browsers.
 **Prevention:** Always implement a global middleware to enforce standard security headers on all HTTP responses, ensuring browsers enforce strict security policies regardless of the endpoint accessed.
+## 2024-05-18 - [Fix Integer Overflow DoS]
+**Vulnerability:** FastAPIs path variables default to unconstrained integers, allowing overly large integers to crash the database connection (e.g. SQLite `OverflowError`).
+**Learning:** Even cleanly typed route parameters (e.g., `ioc_id: int`) don't prevent unbounded integers.
+**Prevention:** Always bound database sequence IDs using `Path(..., le=2147483647)` for typical 32-bit integer columns to safely reject large IDs as 422 Unprocessable Entity instead of 500 crashes.
