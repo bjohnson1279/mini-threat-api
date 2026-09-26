@@ -58,21 +58,30 @@ def test_full_threat_intel_lifecycle():
         assert len(iocs) >= 6
         print(f"[+] Retrieved {len(iocs)} threat indicators from database.")
 
-        # 7. Query with filters (min_confidence >= 90)
+        # 7. Query with pagination (limit and offset)
+        paginated_resp = client.get("/iocs?limit=2&offset=2", headers=headers)
+        assert paginated_resp.status_code == 200
+        paginated_iocs = paginated_resp.json()
+        assert len(paginated_iocs) <= 2
+        # Verify pagination skips the first two records by checking IDs
+        assert paginated_iocs[0]["id"] == iocs[2]["id"]
+        print(f"[+] Pagination works: retrieved {len(paginated_iocs)} records after skipping first 2.")
+
+        # 8. Query with filters (min_confidence >= 90)
         high_conf_resp = client.get("/iocs?min_confidence=90", headers=headers)
         assert high_conf_resp.status_code == 200
         high_conf_iocs = high_conf_resp.json()
         assert all(ioc["confidence_score"] >= 90 for ioc in high_conf_iocs)
         print(f"[+] Filtered high confidence indicators (count: {len(high_conf_iocs)}).")
 
-        # 8. Query with type filter (indicator_type=ipv4)
+        # 9. Query with type filter (indicator_type=ipv4)
         ip_resp = client.get("/iocs?indicator_type=ipv4", headers=headers)
         assert ip_resp.status_code == 200
         ip_iocs = ip_resp.json()
         assert all(ioc["indicator_type"] == "ipv4" for ioc in ip_iocs)
         print(f"[+] Filtered IPv4 indicators (count: {len(ip_iocs)}).")
 
-        # 9. Query with search keyword (search=LockBit)
+        # 10. Query with search keyword (search=LockBit)
         search_resp = client.get("/iocs?search=LockBit", headers=headers)
         assert search_resp.status_code == 200
         search_iocs = search_resp.json()
@@ -80,14 +89,14 @@ def test_full_threat_intel_lifecycle():
         assert "LockBit" in search_iocs[0]["description"]
         print("[+] Partial search query works.")
 
-        # 10. Single IOC lookup
+        # 11. Single IOC lookup
         first_id = iocs[0]["id"]
         single_resp = client.get(f"/iocs/{first_id}", headers=headers)
         assert single_resp.status_code == 200
         assert single_resp.json()["id"] == first_id
         print(f"[+] Retrieved single IOC ID {first_id}.")
 
-        # 11. Ingest a new IOC (POST /iocs)
+        # 12. Ingest a new IOC (POST /iocs)
         new_ioc_payload = {
             "indicator_value": "198.51.100.99",
             "indicator_type": "ipv4",
@@ -104,14 +113,14 @@ def test_full_threat_intel_lifecycle():
         assert created_ioc["id"] is not None
         print(f"[+] Ingested new IOC with ID {created_ioc['id']}.")
 
-        # 12. Pydantic Runtime Validation: reject invalid confidence_score (>100)
+        # 13. Pydantic Runtime Validation: reject invalid confidence_score (>100)
         invalid_payload = new_ioc_payload.copy()
         invalid_payload["confidence_score"] = 999  # Invalid: schema enforces le=100
         invalid_resp = client.post("/iocs", json=invalid_payload, headers=headers)
         assert invalid_resp.status_code == 422  # Unprocessable Entity
         print("[+] Pydantic runtime validation successfully rejected out-of-range confidence_score with 422.")
 
-        # 13. Pydantic Runtime Validation: reject excessive string lengths (DoS/DB error prevention)
+        # 14. Pydantic Runtime Validation: reject excessive string lengths (DoS/DB error prevention)
         long_payload = new_ioc_payload.copy()
         long_payload["indicator_value"] = "A" * 256  # Invalid: schema enforces max_length=255
         long_resp = client.post("/iocs", json=long_payload, headers=headers)
@@ -128,7 +137,7 @@ def test_full_threat_intel_lifecycle():
         assert long_resp3.status_code == 422
         print("[+] Pydantic runtime validation successfully rejected excessive string lengths with 422.")
 
-        # 14. Ensure RBAC authorization is enforced on POST /iocs
+        # 15. Ensure RBAC authorization is enforced on POST /iocs
         # Login as a guest (does not have "threat_analyst" or "admin" role)
         guest_login = client.post(
             "/auth/token",
@@ -144,7 +153,7 @@ def test_full_threat_intel_lifecycle():
         assert "Operation not permitted" in guest_create_resp.json().get("detail", "")
         print("[+] RBAC authorization correctly prevented unauthorized IOC creation with 403.")
 
-        # 15. Verify brute force rate limiting
+        # 16. Verify brute force rate limiting
         for _ in range(5):
             res = client.post(
                 "/auth/token",
