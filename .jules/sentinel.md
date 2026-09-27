@@ -79,3 +79,8 @@
 **Vulnerability:** The `/iocs/{ioc_id}` endpoint accepted an `ioc_id` integer without upper bounds. Supplying a massive integer (e.g. `99999999999999999999`) bypasses Python's internal arbitrary-precision limits but crashes underlying database drivers (like SQLite or Postgres) which expect standard 32-bit (or 64-bit) integers, throwing an `OverflowError` or `DataError` and causing an unhandled 500 Internal Server Error (Denial of Service).
 **Learning:** Python's integers have unbounded precision, but database columns and drivers do not. When a FastAPI path parameter feeds directly into a database query, the type hint `int` alone is insufficient to prevent driver-level crashes.
 **Prevention:** Always strictly validate and limit path parameter integers (e.g., using `Path(..., le=2147483647)`) to match the exact precision limits of the corresponding database column (e.g., a signed 32-bit integer).
+
+## 2024-10-24 - PostgreSQL Driver Issue with SQLAlchemy 2.0
+**Vulnerability:** A CI build failed with `ModuleNotFoundError: No module named 'psycopg'` because SQLAlchemy 2.0 defaults to the `psycopg` (v3) driver for PostgreSQL connections, but the project only had `psycopg2-binary` installed.
+**Learning:** Using `postgresql://` relies on SQLAlchemy's default driver which may conflict with the project's actual dependencies.
+**Prevention:** Always explicitly define the driver in the connection string (e.g., `postgresql+psycopg2://`) to ensure consistent behavior across environments and avoid unexpected `ModuleNotFoundError` crashes.

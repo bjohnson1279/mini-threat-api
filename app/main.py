@@ -197,7 +197,7 @@ def list_iocs(
     summary="Get Indicator by ID"
 )
 def get_ioc_by_id(
-    ioc_id: int = Path(..., le=2147483647),
+    ioc_id: int = Path(..., ge=1, le=2147483647),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
