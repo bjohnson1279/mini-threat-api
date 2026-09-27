@@ -87,6 +87,23 @@ def test_full_threat_intel_lifecycle():
         assert single_resp.json()["id"] == first_id
         print(f"[+] Retrieved single IOC ID {first_id}.")
 
+        # 10.5 Verify pagination (offset and limit)
+        page1_resp = client.get("/iocs?limit=2&offset=0", headers=headers)
+        assert page1_resp.status_code == 200
+        page1_iocs = page1_resp.json()
+        assert len(page1_iocs) == 2
+
+        page2_resp = client.get("/iocs?limit=2&offset=2", headers=headers)
+        assert page2_resp.status_code == 200
+        page2_iocs = page2_resp.json()
+        assert len(page2_iocs) == 2
+
+        # Ensure pages are mutually exclusive
+        page1_ids = {ioc["id"] for ioc in page1_iocs}
+        page2_ids = {ioc["id"] for ioc in page2_iocs}
+        assert page1_ids.isdisjoint(page2_ids)
+        print("[+] Pagination (offset & limit) verified successfully.")
+
         # 11. Ingest a new IOC (POST /iocs)
         new_ioc_payload = {
             "indicator_value": "198.51.100.99",
