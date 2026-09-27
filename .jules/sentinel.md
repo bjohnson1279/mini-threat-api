@@ -74,3 +74,8 @@
 **Vulnerability:** The FastAPI application was missing standard security HTTP headers (like `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`), leaving it potentially vulnerable to MIME-sniffing, clickjacking (on browser-rendered parts like Swagger UI), and lacking forced HTTPS enforcement for consumers.
 **Learning:** Even for pure APIs, setting security headers provides defense-in-depth, especially when hosting auto-generated API documentation UIs (like Swagger/ReDoc) that are rendered in web browsers.
 **Prevention:** Always implement a global middleware to enforce standard security headers on all HTTP responses, ensuring browsers enforce strict security policies regardless of the endpoint accessed.
+
+## 2024-10-24 - Integer Overflow DoS via Unbounded Path Parameters
+**Vulnerability:** The `/iocs/{ioc_id}` endpoint accepted an `ioc_id` integer without upper bounds. Supplying a massive integer (e.g. `99999999999999999999`) bypasses Python's internal arbitrary-precision limits but crashes underlying database drivers (like SQLite or Postgres) which expect standard 32-bit (or 64-bit) integers, throwing an `OverflowError` or `DataError` and causing an unhandled 500 Internal Server Error (Denial of Service).
+**Learning:** Python's integers have unbounded precision, but database columns and drivers do not. When a FastAPI path parameter feeds directly into a database query, the type hint `int` alone is insufficient to prevent driver-level crashes.
+**Prevention:** Always strictly validate and limit path parameter integers (e.g., using `Path(..., le=2147483647)`) to match the exact precision limits of the corresponding database column (e.g., a signed 32-bit integer).
