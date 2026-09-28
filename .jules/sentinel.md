@@ -74,3 +74,8 @@
 **Vulnerability:** The FastAPI application was missing standard security HTTP headers (like `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`), leaving it potentially vulnerable to MIME-sniffing, clickjacking (on browser-rendered parts like Swagger UI), and lacking forced HTTPS enforcement for consumers.
 **Learning:** Even for pure APIs, setting security headers provides defense-in-depth, especially when hosting auto-generated API documentation UIs (like Swagger/ReDoc) that are rendered in web browsers.
 **Prevention:** Always implement a global middleware to enforce standard security headers on all HTTP responses, ensuring browsers enforce strict security policies regardless of the endpoint accessed.
+
+## 2024-10-24 - Integer Overflow DoS
+**Vulnerability:** The `GET /iocs/{ioc_id}` endpoint lacked input validation on the `ioc_id` path parameter. Large positive or negative integers would be passed directly to the database driver, potentially resulting in an `OverflowError` or unhandled database exception (DoS).
+**Learning:** Frameworks like FastAPI do not automatically cap unbound integer parameters to match 32-bit/64-bit limits of the database drivers, enabling attackers to cause internal server errors via out-of-bounds input.
+**Prevention:** Always bound path integers by enforcing schema constraints (e.g., using `Path(..., ge=1, le=2147483647)` for typical 32-bit ID fields) to protect the application and database from unbounded inputs.
