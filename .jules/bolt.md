@@ -39,6 +39,10 @@
 **Learning:** Adding `index=True` to low-cardinality boolean columns (like `is_active`) or columns that already serve as the leftmost prefix of a composite index (like `indicator_type` in `ix_indicators_type_confidence`) creates redundant, standalone indexes. These indexes waste database storage and unnecessarily degrade write (INSERT/UPDATE/DELETE) performance without providing any query performance benefit.
 **Action:** Never add `index=True` to columns that have low cardinality (e.g. boolean fields that aren't exclusively queried) or columns that are already the leftmost prefix of a composite index. Always remove these redundant indexes to optimize write operations and save storage.
 
+## 2024-11-20 - Full Pagination for Large Data Sets
+**Learning:** Returning large datasets without full pagination (using both `limit` and `offset`) can lead to memory exhaustion on the server, excessive data transfer bandwidth, and slow response times.
+**Action:** When designing endpoints that return lists or large datasets, always implement full pagination by providing both `limit` and `offset` query parameters. This prevents the entire dataset from being loaded into memory and ensures scalable performance.
+
 ## Prevention Directives for Automated Refactoring
 - **Never Overwrite Complete Files**: Always use range-scoped replacement chunks (`StartLine`/`EndLine`) for edits to `schema.prisma`, `index.ts`, `public/index.php`, or DDL SQL scripts.
 - **Do Not Remove Core Declarations**: Do not delete existing route registrations or database DDL tables.

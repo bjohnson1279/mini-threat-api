@@ -154,6 +154,7 @@ def list_iocs(
     min_confidence: Optional[int] = Query(0, ge=0, le=100, description="Minimum confidence score threshold (0-100)"),
     search: Optional[str] = Query(None, max_length=255, description="Partial search within indicator value or description"),
     limit: int = Query(50, ge=1, le=500, description="Maximum records to return"),
+    offset: int = Query(0, ge=0, description="Number of records to skip for pagination"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -187,7 +188,10 @@ def list_iocs(
             (Indicator.description.ilike(search_pattern, escape="\\"))
         )
         
-    indicators = query.order_by(Indicator.confidence_score.desc()).limit(limit).all()
+    # ⚡ Bolt Optimization: Add offset to support full pagination for large datasets
+    # Querying large datasets without pagination can cause memory exhaustion and slow response times.
+    # Adding `offset` in conjunction with `limit` ensures efficient retrieval of partial results.
+    indicators = query.order_by(Indicator.confidence_score.desc()).offset(offset).limit(limit).all()
     return indicators
 
 @app.get(
