@@ -15,17 +15,6 @@
 **Learning:** For SQLAlchemy/PostgreSQL database operations, using `db.query(Model).count() == 0` for simple existence checks causes an inefficient O(N) scan across the table.
 **Action:** Prefer `db.query(Model.id).first() is not None` (or `is None`) for an O(1) existence check, especially in application startup or seeding loops, to dramatically improve performance on large tables.
 
-## Prevention Directives for Automated Refactoring
-- **Never Overwrite Complete Files**: Always use range-scoped replacement chunks (`StartLine`/`EndLine`) for edits to `schema.prisma`, `index.ts`, `public/index.php`, or DDL SQL scripts.
-- **Do Not Remove Core Declarations**: Do not delete existing route registrations or database DDL tables.
-- **Environment Isolation Compatibility**: When replacing fallback secrets, preserve test environment execution via `!getenv('APP_ENV')` or `getenv('APP_ENV') === 'testing'`.
-- **No Scratch Files**: Never stage or commit `test_*.ts`, `test_*.js`, `test.cjs`, `fix_*.php`, or `test.js` files to git.
-- **No Unresolved Conflict Markers**: Never stage or commit files containing Git merge conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`, `|||||||`). Always resolve conflicts cleanly before committing.
-
-## Hallucinatory Task & Empty PR Directives
-- **Zero-Diff Task Termination**: If the requested optimization, refactor, or fix is ALREADY natively present in the target branch, DO NOT create an empty pull request or commit an acknowledgment PR. Exit the task cleanly without opening a PR.
-- **Stale Suggestion Guard**: Always verify the current code on `main`/`master` before planning changes. If no actionable diff is required, cancel task execution immediately.
-
 ## 2026-10-25 - Optimize SQLAlchemy Primary Key Lookups
 **Learning:** For SQLAlchemy primary key lookups, using `db.query(Model).filter(Model.id == id).first()` adds overhead because it must compile a filter expression. Furthermore, it will always execute a query against the database.
 **Action:** Always prefer `db.get(Model, id)` for primary key lookups. It avoids compiling the filter expression and can return instantly from the Session's Identity Map without a database roundtrip if the object was already loaded.
@@ -33,6 +22,7 @@
 ## 2024-05-15 - FastAPI GZipMiddleware Optimization
 **Learning:** For endpoints returning large, repetitive JSON payloads like Threat Intel IOC lists, the uncompressed data can become a network bottleneck.
 **Action:** Apply `GZipMiddleware` to compress API responses. This significantly reduces network bandwidth and transit time for clients parsing large datasets. Because the FastAPI `TestClient` (via `httpx`) natively handles gzip, this optimization can often be added safely without breaking existing client expectations.
+
 ## 2024-05-24 - Avoid Threadpool Overhead in FastAPI Dependencies
 **Learning:** Synchronous dependency functions (`def`) in FastAPI are executed in a threadpool to prevent blocking the event loop. This causes unnecessary context switching and thread contention for simple, non-blocking operations like string comparisons (e.g., in `role_checker`).
 **Action:** Always use `async def` for non-blocking dependency functions to run them directly in the event loop, avoiding threadpool overhead and improving performance.
@@ -48,3 +38,22 @@
 ## 2024-08-16 - Redundant Indexes on Low-Cardinality and Composite Prefix Columns
 **Learning:** Adding `index=True` to low-cardinality boolean columns (like `is_active`) or columns that already serve as the leftmost prefix of a composite index (like `indicator_type` in `ix_indicators_type_confidence`) creates redundant, standalone indexes. These indexes waste database storage and unnecessarily degrade write (INSERT/UPDATE/DELETE) performance without providing any query performance benefit.
 **Action:** Never add `index=True` to columns that have low cardinality (e.g. boolean fields that aren't exclusively queried) or columns that are already the leftmost prefix of a composite index. Always remove these redundant indexes to optimize write operations and save storage.
+
+## Prevention Directives for Automated Refactoring
+- **Never Overwrite Complete Files**: Always use range-scoped replacement chunks (`StartLine`/`EndLine`) for edits to `schema.prisma`, `index.ts`, `public/index.php`, or DDL SQL scripts.
+- **Do Not Remove Core Declarations**: Do not delete existing route registrations or database DDL tables.
+- **Environment Isolation Compatibility**: When replacing fallback secrets, preserve test environment execution via `!getenv('APP_ENV')` or `getenv('APP_ENV') === 'testing'`.
+- **No Scratch Files**: Never stage or commit `test_*.ts`, `test_*.js`, `test.cjs`, `fix_*.php`, or `test.js` files to git.
+- **No Unresolved Conflict Markers**: Never stage or commit files containing Git merge conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`, `|||||||`). Always resolve conflicts cleanly before committing.
+- **Never Overwrite Complete Files**: Always use range-scoped replacement chunks for edits to `schema.prisma`, `index.ts`, `public/index.php`, `db/schema.rb`, or DDL SQL scripts.
+
+## Hallucinatory Task & Empty PR Directives
+- **Zero-Diff Task Termination**: If the requested optimization, refactor, or fix is ALREADY natively present in the target branch, DO NOT create an empty pull request or commit an acknowledgment PR. Exit the task cleanly without opening a PR.
+- **Stale Suggestion Guard**: Always verify the current code on `main`/`master` before planning changes. If no actionable diff is required, cancel task execution immediately.
+- **No Journal-Only PRs**: Never open a pull request that only contains updates to .jules/*.md files without corresponding functional code changes and tests.
+
+## Completeness & Verification Directives
+- **Explicit Parameter & Contract Validation**: When creating or modifying API endpoints (Express, Fastify, Rails, Laravel), always implement explicit parameter and request body validation schemas (e.g. `z.string().uuid()`) to prevent unhandled 404/500 fallthroughs.
+- **Database Indexing for Queries**: When addressing query bottlenecks or adding query lookup filters, always implement native database index migrations rather than loading collections into memory and performing array filtering (`.filter()`, `.select`).
+- **Co-Occurring Dependency Auditing**: When bumping any dependency version, verify that other transitive dependencies do not carry high/critical security advisories (e.g. run `bundler-audit`, `npm audit`). Never introduce a version bump that breaks underlying framework APIs.
+- **Self-Verification Before Commit**: Always run syntax checks (`bash -n` for shell scripts, `tsc --noEmit` for TypeScript, linter checks) and targeted test runners locally before opening or updating a PR.
