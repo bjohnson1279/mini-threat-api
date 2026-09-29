@@ -57,3 +57,7 @@ update_*.php
 scratch_*
 *.scratch
 venv2/
+
+fix_*.cjs
+patch_*.py
+patch_*.sh
