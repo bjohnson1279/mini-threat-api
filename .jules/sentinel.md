@@ -79,3 +79,8 @@
 **Vulnerability:** The `GET /iocs/{ioc_id}` endpoint lacked input validation on the `ioc_id` path parameter. Large positive or negative integers would be passed directly to the database driver, potentially resulting in an `OverflowError` or unhandled database exception (DoS).
 **Learning:** Frameworks like FastAPI do not automatically cap unbound integer parameters to match 32-bit/64-bit limits of the database drivers, enabling attackers to cause internal server errors via out-of-bounds input.
 **Prevention:** Always bound path integers by enforcing schema constraints (e.g., using `Path(..., ge=1, le=2147483647)` for typical 32-bit ID fields) to protect the application and database from unbounded inputs.
+
+## 2024-10-24 - Integer Overflow DoS on Query Parameters
+**Vulnerability:** The `GET /iocs` endpoint lacked input validation on the `offset` query parameter. Large positive integers would be passed directly to the database driver for pagination, potentially resulting in an `OverflowError` or unhandled database exception (DoS).
+**Learning:** Frameworks like FastAPI do not automatically cap unbound integer parameters to match 32-bit/64-bit limits of the database drivers. This applies to both path parameters and query parameters like `offset`, enabling attackers to cause internal server errors via out-of-bounds input.
+**Prevention:** Always bound all integer parameters (both path and query) by enforcing schema constraints (e.g., using `Query(..., ge=0, le=2147483647)` for typical 32-bit offset/limit fields) to protect the application and database from unbounded inputs.
