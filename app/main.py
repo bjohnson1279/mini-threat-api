@@ -154,7 +154,7 @@ def list_iocs(
     min_confidence: Optional[int] = Query(0, ge=0, le=100, description="Minimum confidence score threshold (0-100)"),
     search: Optional[str] = Query(None, max_length=255, description="Partial search within indicator value or description"),
     limit: int = Query(50, ge=1, le=500, description="Maximum records to return"),
-    offset: int = Query(0, ge=0, description="Number of records to skip for pagination"),
+    offset: int = Query(0, ge=0, le=2147483647, description="Number of records to skip for pagination"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
