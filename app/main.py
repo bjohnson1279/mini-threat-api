@@ -103,6 +103,26 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     attempts.append(now)
     LOGIN_ATTEMPTS[client_ip] = attempts
 
+    # 🛡️ Sentinel Security Enhancement: Prevent Memory Exhaustion DoS
+    # Clean up the dictionary if it grows too large to prevent an attacker
+    # from crashing the server. We only remove old expired entries to ensure
+    # we don't inadvertently create a rate limiting bypass vulnerability.
+    if len(LOGIN_ATTEMPTS) > 10000:
+        keys_to_delete = [
+            ip for ip, ip_attempts in LOGIN_ATTEMPTS.items()
+            if not ip_attempts or now - ip_attempts[-1] >= 60
+        ]
+        for key in keys_to_delete:
+            del LOGIN_ATTEMPTS[key]
+
+        # Fallback to prevent unbounded growth if still too large
+        if len(LOGIN_ATTEMPTS) > 10000:
+            # We must pop the oldest entries. Since Python 3.7+ dicts are ordered by insertion,
+            # we can remove the first N elements (oldest).
+            excess = len(LOGIN_ATTEMPTS) - 10000
+            for k in list(LOGIN_ATTEMPTS.keys())[:excess]:
+                del LOGIN_ATTEMPTS[k]
+
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
     # 🛡️ Sentinel Security Fix:

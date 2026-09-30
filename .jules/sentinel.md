@@ -104,3 +104,8 @@
 ## 2026-09-29 - Non-Destructive Security Patching & CI Protection
 **Learning:** Security patches must never weaken CI workflow files (`.github/workflows/**`) by appending `|| true` or `continue-on-error: true` to suppress test/build failures. Furthermore, when adding defensive type assertions or input validators in TypeScript, omitting explicit types can introduce `TS7006: Parameter implicitly has an 'any' type`.
 **Action:** Never modify CI workflow definitions to bypass test failures; resolve the underlying issue in source code or test fixtures. Always provide explicit types on newly introduced parameters and helper functions. Ensure zero scratch scripts (`fix_*.php`, `test_*.js`) are committed.
+
+## 2024-10-25 - Rate Limiter Memory Exhaustion DoS
+**Vulnerability:** The basic IP-based rate limiter added to `/auth/token` stored IP attempts indefinitely without a capacity limit. An attacker could spoof thousands of IP addresses to bypass standard restrictions and fill the `LOGIN_ATTEMPTS` dictionary, causing Memory Exhaustion DoS (Denial of Service).
+**Learning:** In-memory stores used for security tracking (like rate limiters) must always be bounded in capacity. Without a hard cap, an attacker can exhaust server memory.
+**Prevention:** Always implement a cap on dictionary sizes for IP tracking. When exceeding limits (e.g. 10000), gracefully clear the dictionary or implement an LRU cache to prevent unbounded growth.
