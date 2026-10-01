@@ -64,6 +64,19 @@ async def add_security_headers_middleware(request: Request, call_next):
 
 # 🛡️ Sentinel Security Fix: Rate Limiting
 LOGIN_ATTEMPTS = {}
+MAX_LOGIN_TRACKING_ENTRIES = 10000
+
+def cleanup_login_attempts():
+    """
+    🛡️ Sentinel Security Enhancement:
+    Cleans up expired entries from the LOGIN_ATTEMPTS dictionary to prevent
+    Memory Exhaustion Denial of Service (DoS) attacks via unbounded growth.
+    Only removes entries older than 60 seconds to avoid Rate Limit Bypass.
+    """
+    now = time.time()
+    expired_ips = [ip for ip, attempts in LOGIN_ATTEMPTS.items() if not any(now - t < 60 for t in attempts)]
+    for ip in expired_ips:
+        del LOGIN_ATTEMPTS[ip]
 
 @app.get("/health", tags=["System"])
 async def health_check():
@@ -90,6 +103,18 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     # 🛡️ Sentinel Security Fix: Implement basic IP-based rate limiting to prevent brute-force DoS
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
+
+    # 🛡️ Sentinel Security Fix: Prevent Memory Exhaustion DoS
+    # Clean up old entries if we exceed capacity, but DO NOT clear the entire dict
+    if len(LOGIN_ATTEMPTS) >= MAX_LOGIN_TRACKING_ENTRIES:
+        cleanup_login_attempts()
+        # If still full after cleanup, drop new tracking to prevent OOM
+        if len(LOGIN_ATTEMPTS) >= MAX_LOGIN_TRACKING_ENTRIES and client_ip not in LOGIN_ATTEMPTS:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Rate limiter at capacity. Please try again later."
+            )
+
     attempts = LOGIN_ATTEMPTS.get(client_ip, [])
     # Filter attempts within the last 60 seconds
     attempts = [t for t in attempts if now - t < 60]
