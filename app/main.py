@@ -64,6 +64,7 @@ async def add_security_headers_middleware(request: Request, call_next):
 
 # 🛡️ Sentinel Security Fix: Rate Limiting
 LOGIN_ATTEMPTS = {}
+LAST_CLEANUP_TIME = time.time()
 
 @app.get("/health", tags=["System"])
 async def health_check():
@@ -90,6 +91,22 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     # 🛡️ Sentinel Security Fix: Implement basic IP-based rate limiting to prevent brute-force DoS
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
+
+    global LAST_CLEANUP_TIME
+    # ⚡ Bolt Optimization: Periodically clean up expired entries to prevent memory exhaustion.
+    # To prevent O(N) CPU exhaustion DoS under high load, cleanup is limited to at most once every 5 minutes.
+    if len(LOGIN_ATTEMPTS) > 1000 and now - LAST_CLEANUP_TIME > 300:
+        LAST_CLEANUP_TIME = now  # Update early to minimize race window
+        for ip in list(LOGIN_ATTEMPTS.keys()):
+            ip_attempts = LOGIN_ATTEMPTS.get(ip)
+            if ip_attempts is None:
+                continue
+            valid_attempts = [t for t in ip_attempts if now - t < 60]
+            if not valid_attempts:
+                LOGIN_ATTEMPTS.pop(ip, None)
+            else:
+                LOGIN_ATTEMPTS[ip] = valid_attempts
+
     attempts = LOGIN_ATTEMPTS.get(client_ip, [])
     # Filter attempts within the last 60 seconds
     attempts = [t for t in attempts if now - t < 60]

@@ -81,3 +81,7 @@
 ## 2026-09-29 - Surgical Optimization Edits and No Scratch Script Commits
 **Learning:** Running whole-file formatters or regenerating entire components while performing performance optimizations introduces massive whitespace/formatting diffs (1,000+ lines), masking the real optimization, invalidating git blame, and causing painful merge conflicts with concurrent PRs. Additionally, committing scratch benchmark or patch scripts (`patch_*.py`, `test.cjs`) pollutes production repositories and triggers CI guardrail failures.
 **Action:** Restrict all algorithmic and performance optimizations to strictly scoped replacement chunks. Diff size must reflect only the functional optimization. Always clean up temporary benchmark or patch scripts with `git rm -f` before committing.
+
+## 2024-03-24 - Prevent Memory Exhaustion in Rate Limiters
+**Learning:** In-memory trackers (like `LOGIN_ATTEMPTS`) grow unbounded if expired entries are never removed, leading to a Memory Exhaustion DoS vulnerability.
+**Action:** Always implement a cleanup mechanism (e.g., periodically removing expired entries when the dictionary size exceeds a threshold) to ensure bounded memory usage in in-memory tracking structures.
