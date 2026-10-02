@@ -64,6 +64,8 @@ async def add_security_headers_middleware(request: Request, call_next):
 
 # 🛡️ Sentinel Security Fix: Rate Limiting
 LOGIN_ATTEMPTS = {}
+LAST_CLEANUP_TIME = time.time()
+MAX_LOGIN_ATTEMPTS_STORE_SIZE = 10000
 
 @app.get("/health", tags=["System"])
 async def health_check():
@@ -88,8 +90,29 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     operation that would otherwise delay all concurrent requests.
     """
     # 🛡️ Sentinel Security Fix: Implement basic IP-based rate limiting to prevent brute-force DoS
+    # and Memory Exhaustion DoS
+    global LAST_CLEANUP_TIME
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
+
+    # Throttled cleanup every 5 minutes (300 seconds) to prevent Memory Exhaustion
+    if now - LAST_CLEANUP_TIME > 300:
+        LAST_CLEANUP_TIME = now
+        for ip in list(LOGIN_ATTEMPTS.keys()):
+            ip_attempts = LOGIN_ATTEMPTS.get(ip, [])
+            valid_attempts = [t for t in ip_attempts if now - t < 60]
+            if not valid_attempts:
+                LOGIN_ATTEMPTS.pop(ip, None)
+            else:
+                LOGIN_ATTEMPTS[ip] = valid_attempts
+
+    # Enforce global capacity limit to prevent unbounded growth during massive bursts
+    if len(LOGIN_ATTEMPTS) >= MAX_LOGIN_ATTEMPTS_STORE_SIZE and client_ip not in LOGIN_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Service is currently experiencing high load. Please try again later."
+        )
+
     attempts = LOGIN_ATTEMPTS.get(client_ip, [])
     # Filter attempts within the last 60 seconds
     attempts = [t for t in attempts if now - t < 60]
