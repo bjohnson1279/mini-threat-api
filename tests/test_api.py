@@ -128,6 +128,15 @@ def test_full_threat_intel_lifecycle():
         assert long_resp3.status_code == 422
         print("[+] Pydantic runtime validation successfully rejected excessive string lengths with 422.")
 
+        # 13.5 Pydantic Runtime Validation: reject malformed data injection
+        malformed_payload = new_ioc_payload.copy()
+        malformed_payload["indicator_value"] = "Not an IP Address"
+        malformed_payload["indicator_type"] = "ipv4"
+        malformed_resp = client.post("/iocs", json=malformed_payload, headers=headers)
+        assert malformed_resp.status_code == 422
+        assert "Invalid IPv4 address format" in str(malformed_resp.json())
+        print("[+] Pydantic runtime validation successfully rejected malformed ipv4 value with 422.")
+
         # 14. Ensure RBAC authorization is enforced on POST /iocs
         # Login as a guest (does not have "threat_analyst" or "admin" role)
         guest_login = client.post(
