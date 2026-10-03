@@ -90,6 +90,7 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     # 🛡️ Sentinel Security Fix: Implement basic IP-based rate limiting to prevent brute-force DoS
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
+
     attempts = LOGIN_ATTEMPTS.get(client_ip, [])
     # Filter attempts within the last 60 seconds
     attempts = [t for t in attempts if now - t < 60]
@@ -101,7 +102,20 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
         )
 
     attempts.append(now)
+    # Pop first to maintain insertion order (LRU behavior) for the cleanup logic below
+    LOGIN_ATTEMPTS.pop(client_ip, None)
     LOGIN_ATTEMPTS[client_ip] = attempts
+
+    # ⚡ Bolt Optimization: Prevent in-memory dictionary from unbounded growth
+    # leading to Memory Exhaustion Denial of Service. Evict oldest via O(1) pop.
+    if len(LOGIN_ATTEMPTS) > 10000:
+        try:
+            oldest_ip = next(iter(LOGIN_ATTEMPTS))
+            # Use pop with None default to prevent KeyError from concurrent threads
+            LOGIN_ATTEMPTS.pop(oldest_ip, None)
+        except RuntimeError:
+            # Safe to pass; a subsequent request will perform the eviction.
+            pass
 
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
