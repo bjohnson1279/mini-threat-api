@@ -1,6 +1,8 @@
 from datetime import datetime
+import ipaddress
+import re
 from typing import Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 # Indicator Types and Severities
 IndicatorTypeEnum = Literal["ipv4", "domain", "sha256", "url", "email"]
@@ -15,6 +17,23 @@ class IOCBase(BaseModel):
     severity: SeverityEnum = Field(default="medium", json_schema_extra={"example": "high"}, description="Assessed severity level")
     description: Optional[str] = Field(None, max_length=500, json_schema_extra={"example": "Associated with BlackCat ransomware campaign"})
     is_active: bool = Field(default=True, description="Whether indicator is currently active")
+
+    @model_validator(mode='after')
+    def validate_indicator_value(self):
+        # 🛡️ Sentinel Security Fix: Implement strict input validation on indicator_value
+        # depending on indicator_type to prevent malformed data injection.
+        if self.indicator_type == "ipv4":
+            try:
+                ipaddress.IPv4Address(self.indicator_value)
+            except ValueError:
+                raise ValueError("Invalid IPv4 address format")
+        elif self.indicator_type == "sha256":
+            if not re.match(r"^[A-Fa-f0-9]{64}$", self.indicator_value):
+                raise ValueError("Invalid SHA256 hash format")
+        elif self.indicator_type == "url":
+            if not self.indicator_value.startswith(("http://", "https://")):
+                raise ValueError("Invalid URL format (must start with http/https)")
+        return self
 
 class IOCCreate(IOCBase):
     """Schema for creating a new IOC (Request Body)."""
