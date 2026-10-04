@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import List, Optional
 import time
 import bcrypt
+import threading
 from fastapi import FastAPI, Depends, HTTPException, Query, Path, status, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -66,6 +67,7 @@ async def add_security_headers_middleware(request: Request, call_next):
 LOGIN_ATTEMPTS = {}
 LAST_CLEANUP_TIME = time.time()
 MAX_LOGIN_ATTEMPTS_STORE_SIZE = 10000
+LOGIN_ATTEMPTS_LOCK = threading.Lock()
 
 @app.get("/health", tags=["System"])
 async def health_check():
@@ -98,33 +100,35 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     # Throttled cleanup every 5 minutes (300 seconds) to prevent Memory Exhaustion
     if now - LAST_CLEANUP_TIME > 300:
         LAST_CLEANUP_TIME = now
-        for ip in list(LOGIN_ATTEMPTS.keys()):
-            ip_attempts = LOGIN_ATTEMPTS.get(ip, [])
-            valid_attempts = [t for t in ip_attempts if now - t < 60]
-            if not valid_attempts:
-                LOGIN_ATTEMPTS.pop(ip, None)
-            else:
-                LOGIN_ATTEMPTS[ip] = valid_attempts
+        with LOGIN_ATTEMPTS_LOCK:
+            for ip in list(LOGIN_ATTEMPTS.keys()):
+                ip_attempts = LOGIN_ATTEMPTS.get(ip, [])
+                valid_attempts = [t for t in ip_attempts if now - t < 60]
+                if not valid_attempts:
+                    LOGIN_ATTEMPTS.pop(ip, None)
+                else:
+                    LOGIN_ATTEMPTS[ip] = valid_attempts
 
     # Enforce global capacity limit to prevent unbounded growth during massive bursts
-    if len(LOGIN_ATTEMPTS) >= MAX_LOGIN_ATTEMPTS_STORE_SIZE and client_ip not in LOGIN_ATTEMPTS:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Service is currently experiencing high load. Please try again later."
-        )
+    with LOGIN_ATTEMPTS_LOCK:
+        if len(LOGIN_ATTEMPTS) >= MAX_LOGIN_ATTEMPTS_STORE_SIZE and client_ip not in LOGIN_ATTEMPTS:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Service is currently experiencing high load. Please try again later."
+            )
 
-    attempts = LOGIN_ATTEMPTS.get(client_ip, [])
-    # Filter attempts within the last 60 seconds
-    attempts = [t for t in attempts if now - t < 60]
+        attempts = LOGIN_ATTEMPTS.get(client_ip, [])
+        # Filter attempts within the last 60 seconds
+        attempts = [t for t in attempts if now - t < 60]
 
-    if len(attempts) >= 5:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts. Please try again later."
-        )
+        if len(attempts) >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many login attempts. Please try again later."
+            )
 
-    attempts.append(now)
-    LOGIN_ATTEMPTS[client_ip] = attempts
+        attempts.append(now)
+        LOGIN_ATTEMPTS[client_ip] = attempts
 
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
