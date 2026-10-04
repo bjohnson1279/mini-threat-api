@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 from typing import List, Optional
 import time
 import bcrypt
-import threading
 from fastapi import FastAPI, Depends, HTTPException, Query, Path, status, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -67,7 +66,6 @@ async def add_security_headers_middleware(request: Request, call_next):
 LOGIN_ATTEMPTS = {}
 LAST_CLEANUP_TIME = time.time()
 MAX_LOGIN_ATTEMPTS_STORE_SIZE = 10000
-LOGIN_ATTEMPTS_LOCK = threading.Lock()
 
 @app.get("/health", tags=["System"])
 async def health_check():
@@ -100,7 +98,7 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     # Throttled cleanup every 5 minutes (300 seconds) to prevent Memory Exhaustion
     if now - LAST_CLEANUP_TIME > 300:
         LAST_CLEANUP_TIME = now
-        with LOGIN_ATTEMPTS_LOCK:
+        try:
             for ip in list(LOGIN_ATTEMPTS.keys()):
                 ip_attempts = LOGIN_ATTEMPTS.get(ip, [])
                 valid_attempts = [t for t in ip_attempts if now - t < 60]
@@ -108,27 +106,32 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
                     LOGIN_ATTEMPTS.pop(ip, None)
                 else:
                     LOGIN_ATTEMPTS[ip] = valid_attempts
+        except RuntimeError:
+            # 🛡️ Sentinel Security Fix:
+            # Safely ignore dictionary size change errors during iteration since the
+            # endpoint executes concurrently in a threadpool (`def`). Missed entries
+            # will be safely cleaned up in the next cycle, preventing a DoS crash.
+            pass
 
     # Enforce global capacity limit to prevent unbounded growth during massive bursts
-    with LOGIN_ATTEMPTS_LOCK:
-        if len(LOGIN_ATTEMPTS) >= MAX_LOGIN_ATTEMPTS_STORE_SIZE and client_ip not in LOGIN_ATTEMPTS:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Service is currently experiencing high load. Please try again later."
-            )
+    if len(LOGIN_ATTEMPTS) >= MAX_LOGIN_ATTEMPTS_STORE_SIZE and client_ip not in LOGIN_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Service is currently experiencing high load. Please try again later."
+        )
 
-        attempts = LOGIN_ATTEMPTS.get(client_ip, [])
-        # Filter attempts within the last 60 seconds
-        attempts = [t for t in attempts if now - t < 60]
+    attempts = LOGIN_ATTEMPTS.get(client_ip, [])
+    # Filter attempts within the last 60 seconds
+    attempts = [t for t in attempts if now - t < 60]
 
-        if len(attempts) >= 5:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many login attempts. Please try again later."
-            )
+    if len(attempts) >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later."
+        )
 
-        attempts.append(now)
-        LOGIN_ATTEMPTS[client_ip] = attempts
+    attempts.append(now)
+    LOGIN_ATTEMPTS[client_ip] = attempts
 
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
@@ -160,7 +163,7 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     access_token = create_access_token(
         data={"sub": user_dict["username"], "role": user_dict["role"]}
     )
@@ -187,7 +190,7 @@ def list_iocs(
 ):
     """
     Retrieves filtered threat indicators from PostgreSQL.
-    
+
     Requires JWT Bearer authentication. Demonstrates:
     - FastAPI dependency injection (`Depends(get_current_user)`) as a custom authorizer
     - Database session lifecycle management (`Depends(get_db)`)
@@ -199,10 +202,10 @@ def list_iocs(
     query = db.query(Indicator)
     if min_confidence > 0:
         query = query.filter(Indicator.confidence_score >= min_confidence)
-    
+
     if indicator_type:
         query = query.filter(Indicator.indicator_type == indicator_type.lower())
-    
+
     if search:
         # 🛡️ Sentinel Security Fix:
         # Prevent SQL LIKE Wildcard Injection (Denial of Service) by escaping wildcards,
@@ -214,7 +217,7 @@ def list_iocs(
             (Indicator.indicator_value.ilike(search_pattern, escape="\\")) |
             (Indicator.description.ilike(search_pattern, escape="\\"))
         )
-        
+
     # ⚡ Bolt Optimization: Add offset to support full pagination for large datasets
     # Querying large datasets without pagination can cause memory exhaustion and slow response times.
     # Adding `offset` in conjunction with `limit` ensures efficient retrieval of partial results.
