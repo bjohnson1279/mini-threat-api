@@ -18,6 +18,13 @@ class IOCBase(BaseModel):
     description: Optional[str] = Field(None, max_length=500, json_schema_extra={"example": "Associated with BlackCat ransomware campaign"})
     is_active: bool = Field(default=True, description="Whether indicator is currently active")
 
+class IOCCreate(IOCBase):
+    """Schema for creating a new IOC (Request Body)."""
+
+    # ⚡ Bolt Optimization: Moved validation from IOCBase to IOCCreate
+    # Moving this expensive `@model_validator` out of `IOCBase` ensures that we don't
+    # re-validate data coming OUT of the database during serialization (in `IOCResponse`),
+    # which is already trusted. This significantly reduces response overhead for endpoints like `GET /iocs`.
     @model_validator(mode='after')
     def validate_indicator_value(self):
         # 🛡️ Sentinel Security Fix: Implement strict input validation on indicator_value
@@ -40,10 +47,6 @@ class IOCBase(BaseModel):
             if not re.match(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z", self.indicator_value):
                 raise ValueError("Invalid domain format")
         return self
-
-class IOCCreate(IOCBase):
-    """Schema for creating a new IOC (Request Body)."""
-    pass
 
 class IOCResponse(IOCBase):
     """
