@@ -8,6 +8,14 @@ from pydantic import BaseModel, Field, ConfigDict, model_validator
 IndicatorTypeEnum = Literal["ipv4", "domain", "sha256", "url", "email"]
 SeverityEnum = Literal["low", "medium", "high", "critical"]
 
+# ⚡ Bolt Optimization: Pre-compile regular expressions
+# Compiling these at the module level prevents Python from having to re-compile
+# (or re-fetch from the internal cache) these patterns on every single request.
+# This significantly speeds up Pydantic request validation during high-throughput ingestion.
+SHA256_REGEX = re.compile(r"^[A-Fa-f0-9]{64}\Z")
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\Z")
+DOMAIN_REGEX = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z")
+
 class IOCBase(BaseModel):
     """Base Pydantic schema with shared threat indicator attributes."""
     indicator_value: str = Field(..., max_length=255, json_schema_extra={"example": "198.51.100.24"}, description="The observable IP, domain, or hash")
@@ -35,16 +43,16 @@ class IOCCreate(IOCBase):
             except ValueError:
                 raise ValueError("Invalid IPv4 address format")
         elif self.indicator_type == "sha256":
-            if not re.match(r"^[A-Fa-f0-9]{64}\Z", self.indicator_value):
+            if not SHA256_REGEX.match(self.indicator_value):
                 raise ValueError("Invalid SHA256 hash format")
         elif self.indicator_type == "url":
             if not self.indicator_value.startswith(("http://", "https://")):
                 raise ValueError("Invalid URL format (must start with http/https)")
         elif self.indicator_type == "email":
-            if not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\Z", self.indicator_value):
+            if not EMAIL_REGEX.match(self.indicator_value):
                 raise ValueError("Invalid email format")
         elif self.indicator_type == "domain":
-            if not re.match(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z", self.indicator_value):
+            if not DOMAIN_REGEX.match(self.indicator_value):
                 raise ValueError("Invalid domain format")
         return self
 
