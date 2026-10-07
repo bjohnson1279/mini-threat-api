@@ -46,7 +46,15 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 def decode_access_token(token: str) -> TokenData:
     """Decodes and verifies a JWT token's signature and expiration."""
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        # 🛡️ Sentinel Security Fix:
+        # Enforce the presence of 'exp' and 'sub' claims in the JWT payload.
+        # This prevents attacks where adversaries omit the 'exp' claim to create tokens that never expire.
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"require_exp": True, "require_sub": True}
+        )
         username: str = payload.get("sub")
         role: str = payload.get("role")
         if username is None:

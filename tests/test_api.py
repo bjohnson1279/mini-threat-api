@@ -178,6 +178,20 @@ def test_full_threat_intel_lifecycle():
         assert rl_res.status_code == 429
         print("[+] Login endpoint rate limiting DoS protection works.")
 
+        # 16. Verify JWT claim enforcement (require_exp)
+        from jose import jwt
+        from app.config import settings
+        token_no_exp = jwt.encode(
+            {"sub": "analyst", "role": "threat_analyst"},
+            settings.JWT_SECRET_KEY,
+            algorithm=settings.JWT_ALGORITHM
+        )
+        malicious_headers = {"Authorization": f"Bearer {token_no_exp}"}
+        no_exp_resp = client.get("/auth/me", headers=malicious_headers)
+        assert no_exp_resp.status_code == 401
+        assert "Could not validate credentials or token expired" in no_exp_resp.json().get("detail", "")
+        print("[+] Successfully rejected JWT token missing 'exp' claim with 401.")
+
         print("\n[SUCCESS] ALL THREAT INTEL API TESTS PASSED!\n")
 
 if __name__ == "__main__":
