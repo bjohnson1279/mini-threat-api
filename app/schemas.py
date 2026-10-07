@@ -28,7 +28,7 @@ class IOCBase(BaseModel):
             except ValueError:
                 raise ValueError("Invalid IPv4 address format")
         elif self.indicator_type == "sha256":
-            if not re.match(r"^[A-Fa-f0-9]{64}$", self.indicator_value):
+            if not re.match(r"^[A-Fa-f0-9]{64}\Z", self.indicator_value):
                 raise ValueError("Invalid SHA256 hash format")
         elif self.indicator_type == "url":
             if not self.indicator_value.startswith(("http://", "https://")):

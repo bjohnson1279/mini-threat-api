@@ -137,6 +137,16 @@ def test_full_threat_intel_lifecycle():
         assert "Invalid IPv4 address format" in str(malformed_resp.json())
         print("[+] Pydantic runtime validation successfully rejected malformed ipv4 value with 422.")
 
+        # 13.6 Pydantic Runtime Validation: reject newline injection in SHA256
+        newline_payload = new_ioc_payload.copy()
+        newline_payload["indicator_type"] = "sha256"
+        # 64-char hex followed by a newline, which passes if regex is `$` instead of `\Z`
+        newline_payload["indicator_value"] = "a" * 64 + "\n"
+        newline_resp = client.post("/iocs", json=newline_payload, headers=headers)
+        assert newline_resp.status_code == 422
+        assert "Invalid SHA256 hash format" in str(newline_resp.json())
+        print("[+] Pydantic runtime validation successfully rejected newline in SHA256 hash with 422.")
+
         # 14. Ensure RBAC authorization is enforced on POST /iocs
         # Login as a guest (does not have "threat_analyst" or "admin" role)
         guest_login = client.post(
