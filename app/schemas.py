@@ -35,11 +35,17 @@ class IOCCreate(IOCBase):
             except ValueError:
                 raise ValueError("Invalid IPv4 address format")
         elif self.indicator_type == "sha256":
-            if not re.match(r"^[A-Fa-f0-9]{64}$", self.indicator_value):
+            if not re.match(r"^[A-Fa-f0-9]{64}\Z", self.indicator_value):
                 raise ValueError("Invalid SHA256 hash format")
         elif self.indicator_type == "url":
             if not self.indicator_value.startswith(("http://", "https://")):
                 raise ValueError("Invalid URL format (must start with http/https)")
+        elif self.indicator_type == "email":
+            if not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\Z", self.indicator_value):
+                raise ValueError("Invalid email format")
+        elif self.indicator_type == "domain":
+            if not re.match(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z", self.indicator_value):
+                raise ValueError("Invalid domain format")
         return self
 
 class IOCResponse(IOCBase):
