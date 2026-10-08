@@ -61,3 +61,8 @@ venv2/
 fix_*.cjs
 patch_*.py
 patch_*.sh
+
+*.diff
+*.patch
+patch.diff
+*.timestamp-*.mjs
