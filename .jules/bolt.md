@@ -43,6 +43,18 @@
 **Learning:** Returning large datasets without full pagination (using both `limit` and `offset`) can lead to memory exhaustion on the server, excessive data transfer bandwidth, and slow response times.
 **Action:** When designing endpoints that return lists or large datasets, always implement full pagination by providing both `limit` and `offset` query parameters. This prevents the entire dataset from being loaded into memory and ensures scalable performance.
 
+## 2026-09-29 - Surgical Optimization Edits and No Scratch Script Commits
+**Learning:** Running whole-file formatters or regenerating entire components while performing performance optimizations introduces massive whitespace/formatting diffs (1,000+ lines), masking the real optimization, invalidating git blame, and causing painful merge conflicts with concurrent PRs. Additionally, committing scratch benchmark or patch scripts (`patch_*.py`, `test.cjs`) pollutes production repositories and triggers CI guardrail failures.
+**Action:** Restrict all algorithmic and performance optimizations to strictly scoped replacement chunks. Diff size must reflect only the functional optimization. Always clean up temporary benchmark or patch scripts with `git rm -f` before committing.
+
+## 2023-11-01 - Avoid Redundant Pydantic Validation on Database Output
+**Learning:** Placing expensive `@model_validator`s (like Regex matches or IP string parsing) on base Pydantic schemas (`IOCBase`) causes the validation to run not just on incoming request parsing (`IOCCreate`), but also redundantly every time a trusted record is serialized from the database into a response (`IOCResponse`). This causes significant CPU overhead and serialization latency on list endpoints (`GET /iocs`) when returning large arrays of objects.
+**Action:** Move expensive and redundant input validation decorators (`@model_validator`) out of base schemas and exclusively into the creation/update schemas (e.g., `IOCCreate`) to ensure validation only runs on untrusted input, maximizing API serialization performance.
+
+## 2024-11-20 - Pre-compiling regex inside Pydantic Models
+**Learning:** Using `re.match` inside Pydantic models triggers redundant internal cache lookups on every request. This is because Pydantic models are instantiated frequently, especially in high-throughput endpoints. Pre-compiling regular expressions into module-level constants and reusing them significantly improves validation performance by eliminating repeated internal cache lookup overhead.
+**Action:** Extract inline regular expressions into module-level `re.compile()` constants and utilize them within `@model_validator` methods.
+
 ## Prevention Directives for Automated Refactoring
 - **Never Overwrite Complete Files**: Always use range-scoped replacement chunks (`StartLine`/`EndLine`) for edits to `schema.prisma`, `index.ts`, `public/index.php`, or DDL SQL scripts.
 - **Do Not Remove Core Declarations**: Do not delete existing route registrations or database DDL tables.
@@ -65,10 +77,10 @@
 ## Assertiveness, Decisive PR Execution & Comparative Recommendations
 - **Proactive & Decisive PR Submission**: Do NOT repeatedly pause to ask permission to open a pull request (e.g., avoid "Would you like me to open a PR for this?", "Can I submit the PR?", "Should I go ahead and create the PR?"). When an optimization, fix, or feature satisfies requirements, passes local test runners/linters, and preserves architectural invariants, proceed decisively to create and submit the Pull Request with a clear, structured summary and rationale.
 - **Explicit Recommendations on Options**: When presenting multiple implementation strategies or architecture options (e.g., Option A vs. Option B), NEVER leave the choice open-ended or passive. Always make an explicit, reasoned recommendation (prefixed with `(Recommended)`) based on **overall technical effectiveness**:
-  1. *Algorithmic & Complexity Gains*: Time and space complexity impact (O(N*M) -> O(N+M), reduction of nested scans).
-  2. *Resource Overhead*: Heap allocations, memory pressure, and GC pause reduction.
-  3. *Domain & Architecture Invariants*: Strict backward compatibility, contract stability, and prevention of regression risks.
-  4. *Security & Reliability*: Input validation, cryptographic safety, and concurrency safety.
+1. *Algorithmic & Complexity Gains*: Time and space complexity impact (O(N*M) -> O(N+M), reduction of nested scans).
+2. *Resource Overhead*: Heap allocations, memory pressure, and GC pause reduction.
+3. *Domain & Architecture Invariants*: Strict backward compatibility, contract stability, and prevention of regression risks.
+4. *Security & Reliability*: Input validation, cryptographic safety, and concurrency safety.
 - **Lead with Recommended Path**: State clearly why the recommended solution delivers the highest net value and immediately execute or propose it as the primary course of action rather than asking open-ended questions.
 
 ## Scope Verification, Minimal Churn & CI Protection Directives
@@ -77,14 +89,6 @@
 - **Zero Scratch File Commits**: Never stage or commit ad-hoc verification, patch, or debug scripts (`test.cjs`, `fix_*.cjs`, `fix_*.php`, `patch_*.py`, `patch_*.sh`, `scratch_*`). Execute checks via the project's native test commands (`npm test`, `pytest`, `phpunit`, etc.) and delete temporary scripts before creating git commits.
 - **Never Weaken CI Workflows**: Do not modify `.github/workflows/**` to bypass failures (e.g. adding `|| true`, setting `continue-on-error: true`, or commenting out assertions). Always resolve the defect in the source code or test fixture.
 - **Explicit Parameter & Variable Types**: In TypeScript files, avoid implicit `any` by always providing explicit types on functions, parameters, and arrow callbacks (e.g. `(id: string) => ...`). Verify zero type errors with `tsc --noEmit` before committing.
-
-## 2026-09-29 - Surgical Optimization Edits and No Scratch Script Commits
-**Learning:** Running whole-file formatters or regenerating entire components while performing performance optimizations introduces massive whitespace/formatting diffs (1,000+ lines), masking the real optimization, invalidating git blame, and causing painful merge conflicts with concurrent PRs. Additionally, committing scratch benchmark or patch scripts (`patch_*.py`, `test.cjs`) pollutes production repositories and triggers CI guardrail failures.
-**Action:** Restrict all algorithmic and performance optimizations to strictly scoped replacement chunks. Diff size must reflect only the functional optimization. Always clean up temporary benchmark or patch scripts with `git rm -f` before committing.
-
-## 2023-11-01 - Avoid Redundant Pydantic Validation on Database Output
-**Learning:** Placing expensive `@model_validator`s (like Regex matches or IP string parsing) on base Pydantic schemas (`IOCBase`) causes the validation to run not just on incoming request parsing (`IOCCreate`), but also redundantly every time a trusted record is serialized from the database into a response (`IOCResponse`). This causes significant CPU overhead and serialization latency on list endpoints (`GET /iocs`) when returning large arrays of objects.
-**Action:** Move expensive and redundant input validation decorators (`@model_validator`) out of base schemas and exclusively into the creation/update schemas (e.g., `IOCCreate`) to ensure validation only runs on untrusted input, maximizing API serialization performance.
 
 ## Additive Documentation & Scratch Cleanliness Directives
 - **Strictly Additive Journal Updates**: When updating `.jules/*.md`, strictly append new dated entries (`## YYYY-MM-DD - Title`). NEVER delete, truncate, or overwrite historical learnings or previous entries.
