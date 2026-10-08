@@ -85,3 +85,7 @@
 ## 2023-11-01 - Avoid Redundant Pydantic Validation on Database Output
 **Learning:** Placing expensive `@model_validator`s (like Regex matches or IP string parsing) on base Pydantic schemas (`IOCBase`) causes the validation to run not just on incoming request parsing (`IOCCreate`), but also redundantly every time a trusted record is serialized from the database into a response (`IOCResponse`). This causes significant CPU overhead and serialization latency on list endpoints (`GET /iocs`) when returning large arrays of objects.
 **Action:** Move expensive and redundant input validation decorators (`@model_validator`) out of base schemas and exclusively into the creation/update schemas (e.g., `IOCCreate`) to ensure validation only runs on untrusted input, maximizing API serialization performance.
+
+## 2024-11-20 - Pre-compiling regex inside Pydantic Models
+**Learning:** Using `re.match` inside Pydantic models triggers redundant internal cache lookups on every request. This is because Pydantic models are instantiated frequently, especially in high-throughput endpoints. Pre-compiling regular expressions into module-level constants and reusing them significantly improves validation performance by eliminating repeated internal cache lookup overhead.
+**Action:** Extract inline regular expressions into module-level `re.compile()` constants and utilize them within `@model_validator` methods.

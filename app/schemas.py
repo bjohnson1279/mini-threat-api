@@ -18,6 +18,14 @@ class IOCBase(BaseModel):
     description: Optional[str] = Field(None, max_length=500, json_schema_extra={"example": "Associated with BlackCat ransomware campaign"})
     is_active: bool = Field(default=True, description="Whether indicator is currently active")
 
+# ⚡ Bolt Optimization: Pre-compile regular expressions for Pydantic validation.
+# Extracting inline regular expressions into module-level compiled constants prevents
+# redundant regex compilation and internal cache lookups on every request,
+# improving per-request validation performance for high-throughput endpoints.
+SHA256_REGEX = re.compile(r"^[A-Fa-f0-9]{64}\Z")
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\Z")
+DOMAIN_REGEX = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z")
+
 class IOCCreate(IOCBase):
     """Schema for creating a new IOC (Request Body)."""
 
@@ -35,16 +43,16 @@ class IOCCreate(IOCBase):
             except ValueError:
                 raise ValueError("Invalid IPv4 address format")
         elif self.indicator_type == "sha256":
-            if not re.match(r"^[A-Fa-f0-9]{64}\Z", self.indicator_value):
+            if not SHA256_REGEX.match(self.indicator_value):
                 raise ValueError("Invalid SHA256 hash format")
         elif self.indicator_type == "url":
             if not self.indicator_value.startswith(("http://", "https://")):
                 raise ValueError("Invalid URL format (must start with http/https)")
         elif self.indicator_type == "email":
-            if not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\Z", self.indicator_value):
+            if not EMAIL_REGEX.match(self.indicator_value):
                 raise ValueError("Invalid email format")
         elif self.indicator_type == "domain":
-            if not re.match(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z", self.indicator_value):
+            if not DOMAIN_REGEX.match(self.indicator_value):
                 raise ValueError("Invalid domain format")
         return self
 
