@@ -128,3 +128,7 @@
 **Vulnerability:** The SHA256 validation regex in `app/schemas.py` used the `$` anchor (`r"^[A-Fa-f0-9]{64}$"`). In Python's `re.match`, the `$` anchor allows an optional trailing newline (`\n`) at the end of the string. This could be exploited for data corruption or injection attacks in downstream systems.
 **Learning:** Python's `re` module behavior for the `$` anchor differs from strictly asserting the absolute end of the string. It permits a trailing newline, which is a common pitfall when validating strict data formats.
 **Prevention:** When writing security-focused regular expressions in Python (e.g., for Pydantic input validation) that must enforce absolute string boundaries, always use `\Z` instead of `$` to prevent trailing newline injections.
+## 2024-10-24 - JWT Permanent Token Forgery
+**Vulnerability:** The `/auth/token` endpoint's token decoding via `python-jose`'s `jwt.decode()` did not enforce the presence of required claims like `exp` (expiration) and `sub` (subject). An attacker could forge a token omitting these claims, leading to permanent token forgery.
+**Learning:** `python-jose` does not strictly enforce the presence of claims by default during decoding.
+**Prevention:** Always explicitly pass `options={"require_exp": True, "require_sub": True}` to `jwt.decode()` to prevent missing claim vulnerabilities.
