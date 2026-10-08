@@ -23,23 +23,6 @@
 **Learning:** Short-circuit evaluation (`not user or not verify_password(...)`) is efficient but creates a side channel when verification involves expensive operations like bcrypt hashing.
 **Prevention:** Always perform a dummy hash verification (using a valid, static dummy hash, e.g., `b"$2b$12$..."` for bcrypt) when a user is not found to ensure consistent response times regardless of whether the user exists or not.
 
-## Prevention Directives for Automated Refactoring
-- **Never Overwrite Complete Files**: Always use range-scoped replacement chunks for edits to `schema.prisma`, `index.ts`, `public/index.php`, `db/schema.rb`, or DDL SQL scripts.
-- **Do Not Remove Core Declarations**: Do not delete existing route registrations or database DDL tables.
-- **Environment Isolation Compatibility**: When replacing fallback secrets, preserve test environment execution via `!getenv('APP_ENV')` or `getenv('APP_ENV') === 'testing'`.
-- **No Scratch Files**: Never stage or commit `test_*.ts`, `test_*.js`, `test.cjs`, `fix_*.php`, or `test.js` files to git.
-- **No Unresolved Conflict Markers**: Never stage or commit files containing Git merge conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`, `|||||||`). Always resolve conflicts cleanly before committing.
-
-## Completeness & Verification Directives
-- **Explicit Parameter & Contract Validation**: When creating or modifying API endpoints (Express, Fastify, Rails, Laravel), always implement explicit parameter and request body validation schemas (e.g. `z.string().uuid()`) to prevent unhandled 404/500 fallthroughs.
-- **Database Indexing for Queries**: When addressing query bottlenecks or adding query lookup filters, always implement native database index migrations rather than loading collections into memory and performing array filtering (`.filter()`, `.select`).
-- **Co-Occurring Dependency Auditing**: When bumping any dependency version, verify that other transitive dependencies do not carry high/critical security advisories (e.g. run `bundler-audit`, `npm audit`). Never introduce a version bump that breaks underlying framework APIs.
-- **Self-Verification Before Commit**: Always run syntax checks (`bash -n` for shell scripts, `tsc --noEmit` for TypeScript, linter checks) and targeted test runners locally before opening or updating a PR.
-
-## Hallucinatory Task & Empty PR Directives
-- **Zero-Diff Task Termination**: If the requested optimization, refactor, or fix is ALREADY natively present in the target branch, DO NOT create an empty pull request or commit an acknowledgment PR. Exit the task cleanly without opening a PR.
-- **Stale Suggestion Guard**: Always verify the current code on `main`/`master` before planning changes. If no actionable diff is required, cancel task execution immediately.
-
 ## 2024-05-24 - Missing Authorization on State-Modifying Endpoint
 **Vulnerability:** The `POST /iocs` endpoint used `get_current_user`, which validates identity (authentication) but not permissions (authorization). Any valid user, including a guest, could ingest threat indicators.
 **Learning:** Authentication dependencies like `Depends(get_current_user)` only prove *who* the user is, not *what* they are allowed to do. State-modifying endpoints must explicitly check roles.
@@ -85,22 +68,6 @@
 **Learning:** Frameworks like FastAPI do not automatically cap unbound integer parameters to match 32-bit/64-bit limits of the database drivers. This applies to both path parameters and query parameters like `offset`, enabling attackers to cause internal server errors via out-of-bounds input.
 **Prevention:** Always bound all integer parameters (both path and query) by enforcing schema constraints (e.g., using `Query(..., ge=0, le=2147483647)` for typical 32-bit offset/limit fields) to protect the application and database from unbounded inputs.
 
-## Assertiveness, Decisive PR Execution & Comparative Recommendations
-- **Proactive & Decisive PR Submission**: Do NOT repeatedly pause to ask permission to open a pull request (e.g., avoid "Would you like me to open a PR for this?", "Can I submit the PR?", "Should I go ahead and create the PR?"). When an optimization, fix, or feature satisfies requirements, passes local test runners/linters, and preserves architectural invariants, proceed decisively to create and submit the Pull Request with a clear, structured summary and rationale.
-- **Explicit Recommendations on Options**: When presenting multiple implementation strategies or architecture options (e.g., Option A vs. Option B), NEVER leave the choice open-ended or passive. Always make an explicit, reasoned recommendation (prefixed with `(Recommended)`) based on **overall technical effectiveness**:
-  1. *Algorithmic & Complexity Gains*: Time and space complexity impact (O(N*M) -> O(N+M), reduction of nested scans).
-  2. *Resource Overhead*: Heap allocations, memory pressure, and GC pause reduction.
-  3. *Domain & Architecture Invariants*: Strict backward compatibility, contract stability, and prevention of regression risks.
-  4. *Security & Reliability*: Input validation, cryptographic safety, and concurrency safety.
-- **Lead with Recommended Path**: State clearly why the recommended solution delivers the highest net value and immediately execute or propose it as the primary course of action rather than asking open-ended questions.
-
-## Scope Verification, Minimal Churn & CI Protection Directives
-- **Scope Verification Before Variable Binding**: When adding interactive states or accessibility attributes (e.g. `disabled={loading}`, `aria-busy={loading}`, `isSubmitting`), NEVER assume a variable identifier exists. Always inspect component props, local state hooks (`useState`), or declaration scope first. If not defined, declare the state hook or reuse an existing scope variable. Never introduce TS2304 / TS2552 ("Cannot find name") compile errors.
-- **Surgical Edits Only (No Whole-File Formatting)**: Never run whole-file code formatters (Prettier, Black, Pint, rustfmt) across unmodified lines. Changes must be strictly range-scoped and limited to the minimal AST block needed. Avoid noisy quote/whitespace churn that masks real logic changes and causes merge conflicts. Verify with `git diff -w` that non-functional churn is zero.
-- **Zero Scratch File Commits**: Never stage or commit ad-hoc verification, patch, or debug scripts (`test.cjs`, `fix_*.cjs`, `fix_*.php`, `patch_*.py`, `patch_*.sh`, `scratch_*`). Execute checks via the project's native test commands (`npm test`, `pytest`, `phpunit`, etc.) and delete temporary scripts before creating git commits.
-- **Never Weaken CI Workflows**: Do not modify `.github/workflows/**` to bypass failures (e.g. adding `|| true`, setting `continue-on-error: true`, or commenting out assertions). Always resolve the defect in the source code or test fixture.
-- **Explicit Parameter & Variable Types**: In TypeScript files, avoid implicit `any` by always providing explicit types on functions, parameters, and arrow callbacks (e.g. `(id: string) => ...`). Verify zero type errors with `tsc --noEmit` before committing.
-
 ## 2026-09-29 - Non-Destructive Security Patching & CI Protection
 **Learning:** Security patches must never weaken CI workflow files (`.github/workflows/**`) by appending `|| true` or `continue-on-error: true` to suppress test/build failures. Furthermore, when adding defensive type assertions or input validators in TypeScript, omitting explicit types can introduce `TS7006: Parameter implicitly has an 'any' type`.
 **Action:** Never modify CI workflow definitions to bypass test failures; resolve the underlying issue in source code or test fixtures. Always provide explicit types on newly introduced parameters and helper functions. Ensure zero scratch scripts (`fix_*.php`, `test_*.js`) are committed.
@@ -109,6 +76,7 @@
 **Vulnerability:** The `/auth/token` endpoint's rate limiting implementation stored login attempts in a global dictionary (`LOGIN_ATTEMPTS`) but lacked a safe cleanup mechanism or a maximum capacity limit. Under a massive burst of requests from unique IP addresses, this unbounded growth could lead to memory exhaustion and a Denial of Service.
 **Learning:** In-memory tracking structures, such as rate limiting dictionaries, must be constrained by capacity and periodically cleaned up. Iterating over the entire structure on every request (O(N) operation) would cause CPU exhaustion under load.
 **Prevention:** Implement throttled cleanup routines (e.g., executing O(N) cleanups periodically rather than on every request) to safely remove expired entries using `.pop()`. Ensure tracking objects have an enforced global size limit, returning a `429 Too Many Requests` error immediately if the limit is exceeded by new requests during massive bursts.
+
 ## 2024-10-24 - Malformed Data Injection via Missing Pydantic Model Validation
 **Vulnerability:** The `IOCBase` Pydantic schema accepted string values for `indicator_value` without validating them against the specified `indicator_type`. This meant an attacker or buggy client could submit malformed data (e.g., `indicator_type: "ipv4"`, `indicator_value: "Not an IP address"`), leading to data corruption and potential crashes or exploitation in downstream security systems that expect strictly formatted IP addresses or hashes.
 **Learning:** Pydantic's basic type checking (e.g., validating a string is a string) is insufficient for security-critical polymorphic data structures where the format of one field depends on the value of another field.
@@ -128,6 +96,44 @@
 **Vulnerability:** The SHA256 validation regex in `app/schemas.py` used the `$` anchor (`r"^[A-Fa-f0-9]{64}$"`). In Python's `re.match`, the `$` anchor allows an optional trailing newline (`\n`) at the end of the string. This could be exploited for data corruption or injection attacks in downstream systems.
 **Learning:** Python's `re` module behavior for the `$` anchor differs from strictly asserting the absolute end of the string. It permits a trailing newline, which is a common pitfall when validating strict data formats.
 **Prevention:** When writing security-focused regular expressions in Python (e.g., for Pydantic input validation) that must enforce absolute string boundaries, always use `\Z` instead of `$` to prevent trailing newline injections.
+
+## 2024-10-24 - Permanent Token Forgery via Missing JWT Claims
+**Vulnerability:** The `/auth/token` endpoint's JWT validation in `decode_access_token` did not enforce the presence of required claims like `exp` (expiration) and `sub` (subject). An attacker who manages to mint a token without an `exp` claim, or intercepts a poorly configured token, could use it indefinitely, bypassing token expiration and session timeouts.
+**Learning:** By default, the `python-jose` JWT decode method only validates claims that are present in the token. If an `exp` claim is missing entirely, the library will successfully decode and validate the token without enforcing an expiration, effectively creating a permanent, non-expiring token.
+**Prevention:** Always explicitly require mandatory security claims when decoding JWTs by passing the `options` argument. For example, use `options={"require_exp": True, "require_sub": True}` in `jwt.decode()` to ensure that the token is rejected immediately if these critical claims are omitted.
+
+## Prevention Directives for Automated Refactoring
+- **Never Overwrite Complete Files**: Always use range-scoped replacement chunks for edits to `schema.prisma`, `index.ts`, `public/index.php`, `db/schema.rb`, or DDL SQL scripts.
+- **Do Not Remove Core Declarations**: Do not delete existing route registrations or database DDL tables.
+- **Environment Isolation Compatibility**: When replacing fallback secrets, preserve test environment execution via `!getenv('APP_ENV')` or `getenv('APP_ENV') === 'testing'`.
+- **No Scratch Files**: Never stage or commit `test_*.ts`, `test_*.js`, `test.cjs`, `fix_*.php`, or `test.js` files to git.
+- **No Unresolved Conflict Markers**: Never stage or commit files containing Git merge conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`, `|||||||`). Always resolve conflicts cleanly before committing.
+
+## Completeness & Verification Directives
+- **Explicit Parameter & Contract Validation**: When creating or modifying API endpoints (Express, Fastify, Rails, Laravel), always implement explicit parameter and request body validation schemas (e.g. `z.string().uuid()`) to prevent unhandled 404/500 fallthroughs.
+- **Database Indexing for Queries**: When addressing query bottlenecks or adding query lookup filters, always implement native database index migrations rather than loading collections into memory and performing array filtering (`.filter()`, `.select`).
+- **Co-Occurring Dependency Auditing**: When bumping any dependency version, verify that other transitive dependencies do not carry high/critical security advisories (e.g. run `bundler-audit`, `npm audit`). Never introduce a version bump that breaks underlying framework APIs.
+- **Self-Verification Before Commit**: Always run syntax checks (`bash -n` for shell scripts, `tsc --noEmit` for TypeScript, linter checks) and targeted test runners locally before opening or updating a PR.
+
+## Hallucinatory Task & Empty PR Directives
+- **Zero-Diff Task Termination**: If the requested optimization, refactor, or fix is ALREADY natively present in the target branch, DO NOT create an empty pull request or commit an acknowledgment PR. Exit the task cleanly without opening a PR.
+- **Stale Suggestion Guard**: Always verify the current code on `main`/`master` before planning changes. If no actionable diff is required, cancel task execution immediately.
+
+## Assertiveness, Decisive PR Execution & Comparative Recommendations
+- **Proactive & Decisive PR Submission**: Do NOT repeatedly pause to ask permission to open a pull request (e.g., avoid "Would you like me to open a PR for this?", "Can I submit the PR?", "Should I go ahead and create the PR?"). When an optimization, fix, or feature satisfies requirements, passes local test runners/linters, and preserves architectural invariants, proceed decisively to create and submit the Pull Request with a clear, structured summary and rationale.
+- **Explicit Recommendations on Options**: When presenting multiple implementation strategies or architecture options (e.g., Option A vs. Option B), NEVER leave the choice open-ended or passive. Always make an explicit, reasoned recommendation (prefixed with `(Recommended)`) based on **overall technical effectiveness**:
+1. *Algorithmic & Complexity Gains*: Time and space complexity impact (O(N*M) -> O(N+M), reduction of nested scans).
+2. *Resource Overhead*: Heap allocations, memory pressure, and GC pause reduction.
+3. *Domain & Architecture Invariants*: Strict backward compatibility, contract stability, and prevention of regression risks.
+4. *Security & Reliability*: Input validation, cryptographic safety, and concurrency safety.
+- **Lead with Recommended Path**: State clearly why the recommended solution delivers the highest net value and immediately execute or propose it as the primary course of action rather than asking open-ended questions.
+
+## Scope Verification, Minimal Churn & CI Protection Directives
+- **Scope Verification Before Variable Binding**: When adding interactive states or accessibility attributes (e.g. `disabled={loading}`, `aria-busy={loading}`, `isSubmitting`), NEVER assume a variable identifier exists. Always inspect component props, local state hooks (`useState`), or declaration scope first. If not defined, declare the state hook or reuse an existing scope variable. Never introduce TS2304 / TS2552 ("Cannot find name") compile errors.
+- **Surgical Edits Only (No Whole-File Formatting)**: Never run whole-file code formatters (Prettier, Black, Pint, rustfmt) across unmodified lines. Changes must be strictly range-scoped and limited to the minimal AST block needed. Avoid noisy quote/whitespace churn that masks real logic changes and causes merge conflicts. Verify with `git diff -w` that non-functional churn is zero.
+- **Zero Scratch File Commits**: Never stage or commit ad-hoc verification, patch, or debug scripts (`test.cjs`, `fix_*.cjs`, `fix_*.php`, `patch_*.py`, `patch_*.sh`, `scratch_*`). Execute checks via the project's native test commands (`npm test`, `pytest`, `phpunit`, etc.) and delete temporary scripts before creating git commits.
+- **Never Weaken CI Workflows**: Do not modify `.github/workflows/**` to bypass failures (e.g. adding `|| true`, setting `continue-on-error: true`, or commenting out assertions). Always resolve the defect in the source code or test fixture.
+- **Explicit Parameter & Variable Types**: In TypeScript files, avoid implicit `any` by always providing explicit types on functions, parameters, and arrow callbacks (e.g. `(id: string) => ...`). Verify zero type errors with `tsc --noEmit` before committing.
 
 ## Additive Documentation & Scratch Cleanliness Directives
 - **Strictly Additive Journal Updates**: When updating `.jules/*.md`, strictly append new dated entries (`## YYYY-MM-DD - Title`). NEVER delete, truncate, or overwrite historical learnings or previous entries.
