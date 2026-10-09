@@ -143,4 +143,4 @@ jobs:
         run: |
           echo "Enabling squash merge for PR #${{ github.event.pull_request.number }}"
           # Only use --squash, do NOT use --auto or gh pr review --approve unless branch protection is enforced
-          gh pr merge ${{ github.event.pull_request.number }} -R ${{ github.repository }} --squash || true
+          gh pr merge ${{ github.event.pull_request.number }} -R ${{ github.repository }} --squash --auto || gh pr merge ${{ github.event.pull_request.number }} -R ${{ github.repository }} --squash || true

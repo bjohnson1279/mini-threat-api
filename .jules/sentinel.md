@@ -93,7 +93,8 @@
 **Prevention:** Always use explicit synchronization primitives, such as `threading.Lock`, when accessing and modifying shared mutable state in a threaded context. Ensure the lock is acquired (e.g., using `with lock:`) around the critical sections where the state is iterated over, read, or modified to maintain data consistency and prevent race conditions or crashes.
 
 ## 2024-10-24 - Python Regex Newline Injection Vulnerability
-**Vulnerability:** The SHA256 validation regex in `app/schemas.py` used the `$` anchor (`r"^[A-Fa-f0-9]{64}$"`). In Python's `re.match`, the `$` anchor allows an optional trailing newline (`\n`) at the end of the string. This could be exploited for data corruption or injection attacks in downstream systems.
+**Vulnerability:** The SHA256 validation regex in `app/schemas.py` used the `$` anchor (`r"^[A-Fa-f0-9]{64}$"`). In Python's `re.match`, the `$` anchor allows an optional trailing newline (`
+`) at the end of the string. This could be exploited for data corruption or injection attacks in downstream systems.
 **Learning:** Python's `re` module behavior for the `$` anchor differs from strictly asserting the absolute end of the string. It permits a trailing newline, which is a common pitfall when validating strict data formats.
 **Prevention:** When writing security-focused regular expressions in Python (e.g., for Pydantic input validation) that must enforce absolute string boundaries, always use `\Z` instead of `$` to prevent trailing newline injections.
 
@@ -149,3 +150,7 @@
 **Vulnerability:** The API responses lacked `Cache-Control`, `Pragma`, and `Referrer-Policy` security headers. This could allow sensitive information, such as threat indicators, user profiles, or JWT tokens if they happen to be in the URL or response body, to be cached by intermediate proxies or the user's browser, potentially leading to unauthorized data exposure if the cache is accessed.
 **Learning:** API responses containing sensitive data should explicitly instruct browsers and proxies not to cache them. While HTTPS encrypts data in transit, it does not prevent local or intermediate caching.
 **Prevention:** Always implement a global HTTP middleware or configure the web server to emit standard security headers like `Cache-Control: no-store, no-cache, must-revalidate`, `Pragma: no-cache`, and `Referrer-Policy: strict-origin-when-cross-origin` to ensure sensitive API responses are never stored.
+
+- **Strict Lowercase Directory Casing**: Always write learning notes to lowercase `.jules/<bot>.md`. Never create, commit, or reference uppercase `.Jules/`.
+
+- **Clean Markdown Formatting**: Always append journal entries using actual newline characters, never literal string escape sequences `\n`.
