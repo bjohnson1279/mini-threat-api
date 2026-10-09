@@ -144,3 +144,8 @@
 - **Strictly Append-Only Journaling**: When adding learnings to `.jules/*.md`, append strictly at the end of the file. Do not rewrite, deduplicate, or remove lines beginning with `## YYYY-MM-DD`.
 - **Surgical Scope Quarantine**: Modify only the files directly involved in the issue and their corresponding test fixtures. Do not delete, rename, or perform drive-by cleanups of unrelated root-level scripts or legacy files.
 - **Coupled Test Fixture Awareness for Security Invariants**: When changing fail-open fallback behavior (such as hardening decryption to fail closed), always update upstream test mocks that rely on plaintext credentials or mock values.
+
+## 2024-10-24 - Missing Cache-Control Headers in API Responses
+**Vulnerability:** The API responses lacked `Cache-Control`, `Pragma`, and `Referrer-Policy` security headers. This could allow sensitive information, such as threat indicators, user profiles, or JWT tokens if they happen to be in the URL or response body, to be cached by intermediate proxies or the user's browser, potentially leading to unauthorized data exposure if the cache is accessed.
+**Learning:** API responses containing sensitive data should explicitly instruct browsers and proxies not to cache them. While HTTPS encrypts data in transit, it does not prevent local or intermediate caching.
+**Prevention:** Always implement a global HTTP middleware or configure the web server to emit standard security headers like `Cache-Control: no-store, no-cache, must-revalidate`, `Pragma: no-cache`, and `Referrer-Policy: strict-origin-when-cross-origin` to ensure sensitive API responses are never stored.
