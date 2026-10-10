@@ -103,3 +103,7 @@
 - **Strict Lowercase Directory Casing**: Always write learning notes to lowercase `.jules/<bot>.md`. Never create, commit, or reference uppercase `.Jules/`.
 
 - **Clean Markdown Formatting**: Always append journal entries using actual newline characters, never literal string escape sequences `\n`.
+
+## 2026-10-10 - Batch SQLAlchemy DB Inserts
+**Learning:** Calling `db.add()` inside a `for` loop evaluates SQLAlchemy's internal object state and auto-flush mechanisms N times, which causes significant overhead and slows down database seeding or bulk ingestion.
+**Action:** Replace iterative single inserts with bulk insert methods like `db.add_all()` or `db.bulk_save_objects()` when creating multiple records simultaneously to bypass redundant overhead and improve initialization performance.
