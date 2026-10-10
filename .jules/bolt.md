@@ -55,6 +55,10 @@
 **Learning:** Using `re.match` inside Pydantic models triggers redundant internal cache lookups on every request. This is because Pydantic models are instantiated frequently, especially in high-throughput endpoints. Pre-compiling regular expressions into module-level constants and reusing them significantly improves validation performance by eliminating repeated internal cache lookup overhead.
 **Action:** Extract inline regular expressions into module-level `re.compile()` constants and utilize them within `@model_validator` methods.
 
+## 2023-10-04 - Precompute loop invariants in hot paths
+**Learning:** Re-evaluating expressions involving external function calls or calculations inside list comprehensions (like `now - t < 60` where `now` is constant) introduces unnecessary overhead on every iteration. This overhead compounds when the list is iterated frequently (like in rate limiting cleanup or validation).
+**Action:** Always precompute invariant calculations (e.g., `cutoff = now - 60`) before loops or comprehensions (using `t > cutoff`) to minimize redundant work and improve hot-path performance.
+
 ## Prevention Directives for Automated Refactoring
 - **Never Overwrite Complete Files**: Always use range-scoped replacement chunks (`StartLine`/`EndLine`) for edits to `schema.prisma`, `index.ts`, `public/index.php`, or DDL SQL scripts.
 - **Do Not Remove Core Declarations**: Do not delete existing route registrations or database DDL tables.
