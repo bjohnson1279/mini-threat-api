@@ -5,6 +5,7 @@ import bcrypt
 import threading
 from fastapi import FastAPI, Depends, HTTPException, Query, Path, status, Request
 from fastapi.middleware.gzip import GZipMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -48,6 +49,9 @@ app = FastAPI(
 # Threat-intel responses can be quite large and repetitive. GZipMiddleware
 # significantly reduces network bandwidth and transit time for large payloads.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# 🛡️ Sentinel Security Fix: Add ProxyHeadersMiddleware to prevent collateral blocking securely
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["127.0.0.1"])
 
 # 🛡️ Sentinel Security Enhancement: Add security headers to all responses
 @app.middleware("http")
