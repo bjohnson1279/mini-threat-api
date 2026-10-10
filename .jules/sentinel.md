@@ -154,3 +154,7 @@
 - **Strict Lowercase Directory Casing**: Always write learning notes to lowercase `.jules/<bot>.md`. Never create, commit, or reference uppercase `.Jules/`.
 
 - **Clean Markdown Formatting**: Always append journal entries using actual newline characters, never literal string escape sequences `\n`.
+## 2024-10-10 - Proxy Collateral Blocking and IP Spoofing
+**Vulnerability:** IP-based rate limiting on `request.client.host` causes collateral blocking when deployed behind a reverse proxy. Additionally, trusting `X-Forwarded-For` blindly without validating trusted hosts introduces an IP spoofing and rate limit bypass vulnerability.
+**Learning:** Always use standard middleware like `ProxyHeadersMiddleware` to parse `X-Forwarded-For` and configure `trusted_hosts` appropriately (e.g., `["127.0.0.1"]` or specific internal IPs) to securely handle trusted proxy validation.
+**Prevention:** Add `ProxyHeadersMiddleware` with strictly defined `trusted_hosts` in production proxy environments.
