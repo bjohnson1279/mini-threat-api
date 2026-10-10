@@ -98,9 +98,11 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     # Throttled cleanup every 5 minutes (300 seconds) to prevent Memory Exhaustion
     if now - LAST_CLEANUP_TIME > 300:
         LAST_CLEANUP_TIME = now
+        # ⚡ Bolt Optimization: Precompute cutoff timestamp to avoid redundant subtraction in loop.
+        cutoff = now - 60
         for ip in list(LOGIN_ATTEMPTS.keys()):
             ip_attempts = LOGIN_ATTEMPTS.get(ip, [])
-            valid_attempts = [t for t in ip_attempts if now - t < 60]
+            valid_attempts = [t for t in ip_attempts if t > cutoff]
             if not valid_attempts:
                 LOGIN_ATTEMPTS.pop(ip, None)
             else:
@@ -115,7 +117,8 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
 
     attempts = LOGIN_ATTEMPTS.get(client_ip, [])
     # Filter attempts within the last 60 seconds
-    attempts = [t for t in attempts if now - t < 60]
+    cutoff = now - 60
+    attempts = [t for t in attempts if t > cutoff]
 
     if len(attempts) >= 5:
         raise HTTPException(
