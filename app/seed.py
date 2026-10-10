@@ -82,8 +82,10 @@ def seed_threat_data(db: Session):
     # after finding the first row. This dramatically speeds up startup on large DBs.
     exists = db.query(Indicator.id).first() is not None
     if not exists:
-        for ioc_data in SAMPLE_IOCS:
-            ioc = Indicator(**ioc_data)
-            db.add(ioc)
+        # ⚡ Bolt Optimization: Replace O(N) single inserts with a single bulk insert
+        # Using db.add_all() or db.bulk_save_objects() avoids the internal overhead of
+        # evaluating auto-flush and object states N times.
+        indicators = [Indicator(**ioc_data) for ioc_data in SAMPLE_IOCS]
+        db.add_all(indicators)
         db.commit()
         print(f"[*] Seeded {len(SAMPLE_IOCS)} initial threat indicators into database.")
