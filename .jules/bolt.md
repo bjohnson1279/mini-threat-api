@@ -81,3 +81,7 @@
 ## 2026-09-29 - Surgical Optimization Edits and No Scratch Script Commits
 **Learning:** Running whole-file formatters or regenerating entire components while performing performance optimizations introduces massive whitespace/formatting diffs (1,000+ lines), masking the real optimization, invalidating git blame, and causing painful merge conflicts with concurrent PRs. Additionally, committing scratch benchmark or patch scripts (`patch_*.py`, `test.cjs`) pollutes production repositories and triggers CI guardrail failures.
 **Action:** Restrict all algorithmic and performance optimizations to strictly scoped replacement chunks. Diff size must reflect only the functional optimization. Always clean up temporary benchmark or patch scripts with `git rm -f` before committing.
+
+## 2023-10-04 - Precompute loop invariants in hot paths
+**Learning:** Re-evaluating expressions involving external function calls or calculations inside list comprehensions (like `now - t < 60` where `now` is constant) introduces unnecessary overhead on every iteration. This overhead compounds when the list is iterated frequently (like in rate limiting cleanup or validation).
+**Action:** Always precompute invariant calculations (e.g., `cutoff = now - 60`) before loops or comprehensions (using `t > cutoff`) to minimize redundant work and improve hot-path performance.
