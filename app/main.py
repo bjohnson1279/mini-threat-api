@@ -3,6 +3,7 @@ from typing import List, Optional
 import time
 import bcrypt
 import threading
+import logging
 from fastapi import FastAPI, Depends, HTTPException, Query, Path, status, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -15,6 +16,9 @@ from app.models import Indicator
 from app.schemas import IOCResponse, IOCCreate, Token, User
 from app.auth import create_access_token, get_current_user, require_role, MOCK_USERS_DB
 from app.seed import seed_threat_data
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("audit")
 
 # Lifespan context: replaces deprecated @app.on_event("startup") in modern FastAPI
 @asynccontextmanager
@@ -165,12 +169,16 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
 
     # Check if user exists and verify password securely
     if not user_exists or not password_matches:
+        # Sanitize username to prevent log injection
+        safe_username = str(form_data.username).replace('\n', '\\n').replace('\r', '\\r')
+        logger.warning(f"Failed login attempt for user: {safe_username} from IP: {client_ip}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    logger.info(f"Successful login for user: {user_dict['username']} from IP: {client_ip}")
     access_token = create_access_token(
         data={"sub": user_dict["username"], "role": user_dict["role"]}
     )
@@ -274,6 +282,7 @@ def create_ioc(
     db.add(new_ioc)
     db.commit()
     db.refresh(new_ioc)
+    logger.info(f"User {current_user.username} ingested new IOC: {ioc_in.indicator_value} (Type: {ioc_in.indicator_type})")
     return new_ioc
 
 @app.get("/auth/me", response_model=User, tags=["Authentication"])
