@@ -25,6 +25,7 @@ class IOCBase(BaseModel):
 SHA256_REGEX = re.compile(r"^[A-Fa-f0-9]{64}\Z")
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\Z")
 DOMAIN_REGEX = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z")
+URL_REGEX = re.compile(r"^https?://[^\s<>\"'`]+\Z")
 
 class IOCCreate(IOCBase):
     """Schema for creating a new IOC (Request Body)."""
@@ -46,8 +47,8 @@ class IOCCreate(IOCBase):
             if not SHA256_REGEX.match(self.indicator_value):
                 raise ValueError("Invalid SHA256 hash format")
         elif self.indicator_type == "url":
-            if not self.indicator_value.startswith(("http://", "https://")):
-                raise ValueError("Invalid URL format (must start with http/https)")
+            if not URL_REGEX.match(self.indicator_value):
+                raise ValueError("Invalid URL format")
         elif self.indicator_type == "email":
             if not EMAIL_REGEX.match(self.indicator_value):
                 raise ValueError("Invalid email format")
