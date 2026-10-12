@@ -82,11 +82,11 @@ def seed_threat_data(db: Session):
     # after finding the first row. This dramatically speeds up startup on large DBs.
     exists = db.query(Indicator.id).first() is not None
     if not exists:
-        # ⚡ Bolt Optimization: Use db.add_all() for batch insert
-        # Batching database inserts using add_all() avoids the internal overhead
-        # of evaluating auto-flush and object states N times during startup,
-        # significantly improving bulk insert performance compared to calling db.add() in a loop.
+        # ⚡ Bolt Optimization: Use session.bulk_save_objects() for genuine batch insert
+        # session.add_all() simply iterates and calls add() internally.
+        # session.bulk_save_objects() performs genuine batch inserts without the
+        # overhead of ORM state management, dramatically improving bulk ingestion performance.
         iocs = [Indicator(**ioc_data) for ioc_data in SAMPLE_IOCS]
-        db.add_all(iocs)
+        db.bulk_save_objects(iocs)
         db.commit()
         print(f"[*] Seeded {len(SAMPLE_IOCS)} initial threat indicators into database.")

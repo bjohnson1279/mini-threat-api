@@ -107,3 +107,7 @@
 - **Strict Lowercase Directory Casing**: Always write learning notes to lowercase `.jules/<bot>.md`. Never create, commit, or reference uppercase `.Jules/`.
 
 - **Clean Markdown Formatting**: Always append journal entries using actual newline characters, never literal string escape sequences `\n`.
+
+## 2024-11-20 - Use bulk_save_objects over add_all for bulk inserts
+**Learning:** In SQLAlchemy, `Session.add_all()` simply iterates over the collection and calls `Session.add()` for each item internally, meaning it does not perform a true batch insert at the database level and still incurs the overhead of ORM state management.
+**Action:** For genuine bulk data ingestion performance improvements, use `session.bulk_save_objects()` or an `insert().values()` construct instead of `db.add_all()`.
