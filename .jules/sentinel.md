@@ -158,6 +158,7 @@
 **Vulnerability:** IP-based rate limiting on `request.client.host` causes collateral blocking when deployed behind a reverse proxy. Additionally, trusting `X-Forwarded-For` blindly without validating trusted hosts introduces an IP spoofing and rate limit bypass vulnerability.
 **Learning:** Always use standard middleware like `ProxyHeadersMiddleware` to parse `X-Forwarded-For` and configure `trusted_hosts` appropriately (e.g., `["127.0.0.1"]` or specific internal IPs) to securely handle trusted proxy validation.
 **Prevention:** Add `ProxyHeadersMiddleware` with strictly defined `trusted_hosts` in production proxy environments.
+
 ## 2025-02-19 - URL Validation Bypass (XSS / CRLF Injection)
 **Vulnerability:** URL indicator validation only checked if the input string started with `http://` or `https://` (`startswith()`). This allowed malicious users to ingest URLs containing injected newlines (`\n`) or XSS payloads (`<script>`).
 **Learning:** `startswith()` is structurally insufficient for validating complex string formats like URLs where malicious payloads can be appended at the end of the string.
