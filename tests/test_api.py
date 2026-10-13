@@ -147,6 +147,20 @@ def test_full_threat_intel_lifecycle():
         assert "Invalid SHA256 hash format" in str(newline_resp.json())
         print("[+] Pydantic runtime validation successfully rejected newline in SHA256 hash with 422.")
 
+        # 13.7 Pydantic Runtime Validation: reject XSS and CRLF in URL
+        xss_payload = new_ioc_payload.copy()
+        xss_payload["indicator_type"] = "url"
+        xss_payload["indicator_value"] = "http://example.com/<script>alert(1)</script>"
+        xss_resp = client.post("/iocs", json=xss_payload, headers=headers)
+        assert xss_resp.status_code == 422
+
+        crlf_payload = new_ioc_payload.copy()
+        crlf_payload["indicator_type"] = "url"
+        crlf_payload["indicator_value"] = "http://example.com\n"
+        crlf_resp = client.post("/iocs", json=crlf_payload, headers=headers)
+        assert crlf_resp.status_code == 422
+        print("[+] Pydantic runtime validation successfully rejected XSS/CRLF in URL with 422.")
+
         # 14. Ensure RBAC authorization is enforced on POST /iocs
         # Login as a guest (does not have "threat_analyst" or "admin" role)
         guest_login = client.post(
