@@ -1,8 +1,9 @@
 from datetime import datetime
 import ipaddress
 import re
+import html
 from typing import Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
 
 # Indicator Types and Severities
 IndicatorTypeEnum = Literal["ipv4", "domain", "sha256", "url", "email"]
@@ -29,6 +30,14 @@ URL_REGEX = re.compile(r"^https?://[^\s<>\"'\`]+\Z")
 
 class IOCCreate(IOCBase):
     """Schema for creating a new IOC (Request Body)."""
+
+    # 🛡️ Sentinel Security Fix: Sanitize user input to prevent XSS
+    @field_validator("threat_type", "description", mode="before")
+    @classmethod
+    def sanitize_html(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and isinstance(v, str):
+            return html.escape(v)
+        return v
 
     # ⚡ Bolt Optimization: Moved validation from IOCBase to IOCCreate
     # Moving this expensive `@model_validator` out of `IOCBase` ensures that we don't
