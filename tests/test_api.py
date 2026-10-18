@@ -15,7 +15,11 @@ def test_full_threat_intel_lifecycle():
         health_resp = client.get("/health")
         assert health_resp.status_code == 200
         assert health_resp.json() == {"status": "healthy", "service": "threat-intel-api"}
-        print("\n[+] Health check passed.")
+
+        # Verify security headers
+        assert health_resp.headers.get("Permissions-Policy") == "geolocation=(), camera=(), microphone=()"
+        assert health_resp.headers.get("Content-Security-Policy") == "object-src 'none'; base-uri 'none';"
+        print("\n[+] Health check and security headers verification passed.")
 
         # 2. Rejection of unauthenticated requests to protected endpoints
         unauth_resp = client.get("/iocs")

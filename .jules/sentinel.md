@@ -162,3 +162,7 @@
 **Vulnerability:** URL indicator validation only checked if the input string started with `http://` or `https://` (`startswith()`). This allowed malicious users to ingest URLs containing injected newlines (`\n`) or XSS payloads (`<script>`).
 **Learning:** `startswith()` is structurally insufficient for validating complex string formats like URLs where malicious payloads can be appended at the end of the string.
 **Prevention:** Always use strict regex (e.g., `^https?://[^\s<>"'\`]+\Z`) with absolute termination (`\Z`) or a dedicated URL parser to enforce boundaries and exclude forbidden characters like whitespace and angle brackets.
+## 2025-02-28 - Missing Permissions-Policy and CSP Headers
+**Vulnerability:** The API lacked `Permissions-Policy` and `Content-Security-Policy` headers. This could allow API clients or Swagger UI to unnecessarily access browser features (like geolocation or camera) or execute malicious plugins if an XSS vulnerability exists.
+**Learning:** Defense-in-depth requires adding restrictive `Permissions-Policy` to disable unused browser features and `Content-Security-Policy` (e.g., `object-src 'none'; base-uri 'none';`) to mitigate risks of XSS and malicious base URI injections.
+**Prevention:** Always add these headers globally in the application's HTTP middleware to secure all API responses, especially when API documentation UIs are hosted on the same domain.

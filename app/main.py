@@ -67,6 +67,8 @@ async def add_security_headers_middleware(request: Request, call_next):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+    response.headers["Content-Security-Policy"] = "object-src 'none'; base-uri 'none';"
     return response
 
 
