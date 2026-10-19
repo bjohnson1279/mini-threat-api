@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import uuid
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -38,8 +39,15 @@ MOCK_USERS_DB = {
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Encodes a signed JWT with expiration timestamp and custom claims."""
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    # 🛡️ Sentinel Security Enhancement: Add iat, nbf, and jti claims for defense-in-depth
+    to_encode.update({
+        "exp": expire,
+        "iat": now,
+        "nbf": now,
+        "jti": str(uuid.uuid4())
+    })
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
@@ -49,11 +57,18 @@ def decode_access_token(token: str) -> TokenData:
         # 🛡️ Sentinel Security Fix:
         # Enforce the presence of 'exp' and 'sub' claims in the JWT payload.
         # This prevents attacks where adversaries omit the 'exp' claim to create tokens that never expire.
+        # 🛡️ Sentinel Security Enhancement: Also enforce 'iat', 'nbf', and 'jti' claims.
         payload = jwt.decode(
             token,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
-            options={"require_exp": True, "require_sub": True}
+            options={
+                "require_exp": True,
+                "require_sub": True,
+                "require_iat": True,
+                "require_nbf": True,
+                "require_jti": True
+            }
         )
         username: str = payload.get("sub")
         role: str = payload.get("role")
