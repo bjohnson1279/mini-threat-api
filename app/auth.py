@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import uuid
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -38,8 +39,16 @@ MOCK_USERS_DB = {
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Encodes a signed JWT with expiration timestamp and custom claims."""
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    # 🛡️ Sentinel Security Enhancement: Add iat, nbf, and jti claims
+    # Enhances JWT security by preventing token replay and enforcing temporal validity.
+    to_encode.update({
+        "exp": expire,
+        "iat": now,
+        "nbf": now,
+        "jti": str(uuid.uuid4())
+    })
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
