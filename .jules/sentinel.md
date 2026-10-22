@@ -166,3 +166,8 @@
 **Vulnerability:** The API lacked `Permissions-Policy` and `Content-Security-Policy` headers. This could allow API clients or Swagger UI to unnecessarily access browser features (like geolocation or camera) or execute malicious plugins if an XSS vulnerability exists.
 **Learning:** Defense-in-depth requires adding restrictive `Permissions-Policy` to disable unused browser features and `Content-Security-Policy` (e.g., `object-src 'none'; base-uri 'none';`) to mitigate risks of XSS and malicious base URI injections.
 **Prevention:** Always add these headers globally in the application's HTTP middleware to secure all API responses, especially when API documentation UIs are hosted on the same domain.
+
+## 2024-10-22 - Graceful JWT Claim Upgrades
+**Vulnerability:** Weak JWT generation lacking `iat` (Issued At), `nbf` (Not Before), and `jti` (JWT ID) claims, which limits the ability to track, revoke, or restrict token usage tightly.
+**Learning:** While it is a security best practice to add `iat`, `nbf`, and `jti` claims to newly generated JWTs, immediately enforcing their presence during the decoding process (e.g., `options={"require_iat": True}`) will instantaneously invalidate all active, unexpired tokens currently in circulation. This introduces a severe, breaking regression for existing clients.
+**Prevention:** Always implement a grace period when upgrading JWT claim structures. Generate new tokens with the enhanced claims, but do not strictly require them during validation until all legacy tokens have naturally expired.
