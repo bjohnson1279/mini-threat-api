@@ -6,12 +6,14 @@ import threading
 import logging
 from fastapi import FastAPI, Depends, HTTPException, Query, Path, status, Request
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.database import engine, Base, get_db
+from app.config import settings
 from app.models import Indicator
 from app.schemas import IOCResponse, IOCCreate, Token, User
 from app.auth import create_access_token, get_current_user, require_role, MOCK_USERS_DB
@@ -47,6 +49,15 @@ app = FastAPI(
     description="A high-performance FastAPI service demonstrating Threat Intel Indicator ingestion, querying, and JWT Custom Authorizers.",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# 🛡️ Sentinel Security Enhancement: Add restrictive CORS policy
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS.split(",")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ⚡ Bolt Optimization: Add GZipMiddleware to compress large JSON responses
