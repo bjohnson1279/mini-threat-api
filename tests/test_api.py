@@ -209,6 +209,16 @@ def test_full_threat_intel_lifecycle():
         assert no_exp_resp.status_code == 401
         assert "Could not validate credentials or token expired" in no_exp_resp.json().get("detail", "")
         print("[+] Successfully rejected JWT token missing 'exp' claim with 401.")
+        # 17. Verify JWT contains iat, nbf, and jti claims
+        decoded_token = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM]
+        )
+        assert "iat" in decoded_token
+        assert "nbf" in decoded_token
+        assert "jti" in decoded_token
+        print("[+] JWT correctly includes iat, nbf, and jti claims.")
 
         print("\n[SUCCESS] ALL THREAT INTEL API TESTS PASSED!\n")
 
