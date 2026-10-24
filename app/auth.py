@@ -3,9 +3,12 @@ import uuid
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+import logging
 from jose import JWTError, jwt
 from app.config import settings
 from app.schemas import TokenData, User
+
+logger = logging.getLogger("audit")
 
 # OAuth2PasswordBearer tells FastAPI that the client should send the token
 # in the 'Authorization: Bearer <token>' header, and documents this in Swagger UI.
@@ -110,6 +113,9 @@ def require_role(required_role: str):
     # Using `async def` avoids running this non-blocking endpoint in a threadpool, decreasing overhead.
     async def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role != required_role and current_user.role != "admin":
+            # 🛡️ Sentinel Security Fix: Audit log RBAC failures
+            safe_username = current_user.username.replace('\n', '\\n').replace('\r', '\\r')
+            logger.warning(f"Audit: Unauthorized access attempt by user '{safe_username}' (role: {current_user.role}) requiring role '{required_role}'")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Operation not permitted. Requires '{required_role}' role.",
