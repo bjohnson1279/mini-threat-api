@@ -6,3 +6,4 @@ os.environ.setdefault("JWT_SECRET_KEY", "mock_local_test_jwt_secret_key_12345678
 os.environ.setdefault("DATABASE_URL", "sqlite:///./threat_intel_test.db")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+os.environ.setdefault("CORS_ORIGINS", "http://localhost:8000,http://localhost:3000")
