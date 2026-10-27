@@ -165,6 +165,15 @@ def test_full_threat_intel_lifecycle():
         assert crlf_resp.status_code == 422
         print("[+] Pydantic runtime validation successfully rejected XSS/CRLF in URL with 422.")
 
+        # 13.8 Reject excessively long credentials on authentication endpoint
+        long_auth = client.post(
+            "/auth/token",
+            data={"username": "A" * 256, "password": "password123"}
+        )
+        assert long_auth.status_code == 400
+        assert "payload too large" in str(long_auth.json())
+        print("[+] OAuth2 form length validation successfully rejected excessive inputs with 400.")
+
         # 14. Ensure RBAC authorization is enforced on POST /iocs
         # Login as a guest (does not have "threat_analyst" or "admin" role)
         guest_login = client.post(
