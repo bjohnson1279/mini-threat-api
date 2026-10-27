@@ -115,6 +115,13 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     This avoids blocking the main event loop since `bcrypt.checkpw()` is a CPU-bound
     operation that would otherwise delay all concurrent requests.
     """
+    # 🛡️ Sentinel Security Fix: Prevent Memory Exhaustion / Payload DoS
+    if len(form_data.username) > 255 or len(form_data.password) > 255:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid input length",
+        )
+
     # 🛡️ Sentinel Security Fix: Implement basic IP-based rate limiting to prevent brute-force DoS
     # and Memory Exhaustion DoS
     global LAST_CLEANUP_TIME
