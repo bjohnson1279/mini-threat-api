@@ -179,3 +179,7 @@
 **Vulnerability:** The `/auth/token` endpoint uses `OAuth2PasswordRequestForm` without any native length validation for the form data attributes like `username` or `password`. This allowed for an attacker to send an arbitrarily large string which consumes huge amounts of memory and CPU cycles, leading to a Memory Exhaustion DoS or Payload/Regex DoS.
 **Learning:** `OAuth2PasswordRequestForm` depends on standard forms and doesn't support the same Pydantic size constraints (like `max_length=255`) that you would get by default on `BaseModel`s. Fastapi has no native length limits for this.
 **Prevention:** Always manually validate the length of form fields from `OAuth2PasswordRequestForm` at the beginning of the authentication endpoint before processing the data, especially before computationally expensive operations like `bcrypt.checkpw()`.
+## 2025-02-28 - Secure Error Handling
+**Vulnerability:** Potential Information Leakage via Stack Traces.
+**Learning:** Default unhandled exceptions might expose sensitive internal implementation details (e.g., stack traces) to the client, which attackers can use for further exploitation.
+**Prevention:** Implement a global exception handler (e.g., `@app.exception_handler(Exception)` in FastAPI) to catch unexpected errors and return a generic 500 response without exposing stack traces.

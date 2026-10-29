@@ -5,6 +5,7 @@ import bcrypt
 import threading
 import logging
 from fastapi import FastAPI, Depends, HTTPException, Query, Path, status, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -50,6 +51,15 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# 🛡️ Sentinel Security Enhancement: Catch all unhandled exceptions to prevent stack trace leaks
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error"}
+    )
 
 # 🛡️ Sentinel Security Enhancement: Add restrictive CORS policy
 app.add_middleware(
