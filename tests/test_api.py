@@ -231,5 +231,263 @@ def test_full_threat_intel_lifecycle():
 
         print("\n[SUCCESS] ALL THREAT INTEL API TESTS PASSED!\n")
 
+
+def test_pydantic_schema_validation_and_sanitization():
+    """
+    Unit test suite targeting Pydantic schema validation and HTML input sanitization:
+    - Domain indicator format validation
+    - Email indicator format validation
+    - HTML input sanitization (XSS escaping in threat_type and description)
+    """
+    from app.main import LOGIN_ATTEMPTS, LOGIN_ATTEMPTS_LOCK
+    with LOGIN_ATTEMPTS_LOCK:
+        LOGIN_ATTEMPTS.clear()
+
+    with TestClient(app) as client:
+        # Get auth token as threat analyst
+        login_resp = client.post(
+            "/auth/token",
+            data={"username": "analyst", "password": "password123"}
+        )
+        assert login_resp.status_code == 200
+        token = login_resp.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Reject invalid domain format
+        invalid_domain_payload = {
+            "indicator_value": "not_a_valid_domain",
+            "indicator_type": "domain",
+            "threat_type": "phishing",
+            "confidence_score": 75,
+            "severity": "high"
+        }
+        resp = client.post("/iocs", json=invalid_domain_payload, headers=headers)
+        assert resp.status_code == 422
+        assert "Invalid domain format" in str(resp.json())
+
+        # 2. Reject invalid email format
+        invalid_email_payload = {
+            "indicator_value": "not_an_email_address",
+            "indicator_type": "email",
+            "threat_type": "phishing",
+            "confidence_score": 80,
+            "severity": "medium"
+        }
+        resp = client.post("/iocs", json=invalid_email_payload, headers=headers)
+        assert resp.status_code == 422
+        assert "Invalid email format" in str(resp.json())
+
+        # 3. Accept valid domain indicator
+        valid_domain_payload = {
+            "indicator_value": "malicious-c2.example.com",
+            "indicator_type": "domain",
+            "threat_type": "c2",
+            "confidence_score": 90,
+            "severity": "critical"
+        }
+        resp = client.post("/iocs", json=valid_domain_payload, headers=headers)
+        assert resp.status_code == 201
+        assert resp.json()["indicator_value"] == "malicious-c2.example.com"
+
+        # 4. Accept valid email indicator
+        valid_email_payload = {
+            "indicator_value": "phisher@bad-actor.org",
+            "indicator_type": "email",
+            "threat_type": "spear_phishing",
+            "confidence_score": 85,
+            "severity": "high"
+        }
+        resp = client.post("/iocs", json=valid_email_payload, headers=headers)
+        assert resp.status_code == 201
+        assert resp.json()["indicator_value"] == "phisher@bad-actor.org"
+
+        # 5. HTML Input Sanitization (XSS prevention)
+        xss_sanitization_payload = {
+            "indicator_value": "198.51.100.123",
+            "indicator_type": "ipv4",
+            "threat_type": "<script>alert('xss')</script>c2",
+            "description": "<img src=x onerror=alert(1)>Malicious node",
+            "confidence_score": 70,
+            "severity": "medium"
+        }
+        resp = client.post("/iocs", json=xss_sanitization_payload, headers=headers)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert "<script>" not in data["threat_type"]
+        assert "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;c2" == data["threat_type"]
+        assert "<img" not in data["description"]
+        assert "&lt;img src=x onerror=alert(1)&gt;Malicious node" == data["description"]
+
+
+def test_jwt_security_and_rbac_authorization():
+    """
+    Unit test suite targeting JWT decoding edge cases and RBAC authorization:
+    - JWT token missing 'sub' claim rejection
+    - JWT token with invalid signature rejection
+    - Disabled user authentication rejection
+    - Admin role permission grant for `require_role("threat_analyst")`
+    """
+    from jose import jwt
+    from app.config import settings
+    from app.main import LOGIN_ATTEMPTS, LOGIN_ATTEMPTS_LOCK
+
+    with LOGIN_ATTEMPTS_LOCK:
+        LOGIN_ATTEMPTS.clear()
+
+    with TestClient(app) as client:
+        # 1. JWT token missing 'sub' claim
+        token_no_sub = jwt.encode(
+            {"role": "threat_analyst", "exp": 9999999999},
+            settings.JWT_SECRET_KEY,
+            algorithm=settings.JWT_ALGORITHM
+        )
+        resp = client.get("/auth/me", headers={"Authorization": f"Bearer {token_no_sub}"})
+        assert resp.status_code == 401
+        assert "Could not validate credentials" in resp.json()["detail"] or "missing subject" in resp.json()["detail"]
+
+        # 2. JWT token with invalid secret / signature
+        bad_sig_token = jwt.encode(
+            {"sub": "analyst", "role": "threat_analyst", "exp": 9999999999},
+            "wrong_secret_key_12345",
+            algorithm=settings.JWT_ALGORITHM
+        )
+        resp = client.get("/auth/me", headers={"Authorization": f"Bearer {bad_sig_token}"})
+        assert resp.status_code == 401
+
+        # 3. Disabled user authentication rejection
+        from app.auth import MOCK_USERS_DB
+        MOCK_USERS_DB["disabled_user"] = {
+            "username": "disabled_user",
+            "password": "$2b$12$v1B3NFjxLnulAxo8hmmE8.wX7DP7pExSaVPCDr74ERGYQm3lkjqc6",
+            "role": "threat_analyst",
+            "disabled": True
+        }
+        disabled_login = client.post(
+            "/auth/token",
+            data={"username": "disabled_user", "password": "password123"}
+        )
+        assert disabled_login.status_code == 401
+
+        # Also test JWT token for a user that was disabled after token issuance
+        disabled_jwt = jwt.encode(
+            {"sub": "disabled_user", "role": "threat_analyst", "exp": 9999999999},
+            settings.JWT_SECRET_KEY,
+            algorithm=settings.JWT_ALGORITHM
+        )
+        disabled_jwt_resp = client.get("/auth/me", headers={"Authorization": f"Bearer {disabled_jwt}"})
+        assert disabled_jwt_resp.status_code == 400
+        assert "Inactive user" in disabled_jwt_resp.json()["detail"]
+
+        # Cleanup mock user
+        del MOCK_USERS_DB["disabled_user"]
+
+        # 4. Admin role permission grant in require_role
+        admin_login = client.post(
+            "/auth/token",
+            data={"username": "admin", "password": "adminpassword123"}
+        )
+        assert admin_login.status_code == 200
+        admin_token = admin_login.json()["access_token"]
+        admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+        admin_ioc_payload = {
+            "indicator_value": "198.51.100.200",
+            "indicator_type": "ipv4",
+            "threat_type": "admin_created_c2",
+            "confidence_score": 100,
+            "severity": "critical"
+        }
+        admin_create_resp = client.post("/iocs", json=admin_ioc_payload, headers=admin_headers)
+        assert admin_create_resp.status_code == 201
+        assert admin_create_resp.json()["indicator_value"] == "198.51.100.200"
+
+
+def test_ioc_query_and_lookup_boundary_conditions():
+    """
+    Integration test suite targeting IOC querying and lookup boundary conditions:
+    - 404 response for non-existent IOC ID lookup
+    - 422 Unprocessable Entity for out-of-range path or query parameters (e.g. ioc_id <= 0, offset < 0)
+    - SQL wildcard character escaping (`%` and `_`) in search queries
+    - Pagination offset and limit edge cases
+    """
+    from app.main import LOGIN_ATTEMPTS, LOGIN_ATTEMPTS_LOCK
+
+    with LOGIN_ATTEMPTS_LOCK:
+        LOGIN_ATTEMPTS.clear()
+
+    with TestClient(app) as client:
+        # Get auth token as threat analyst
+        login_resp = client.post(
+            "/auth/token",
+            data={"username": "analyst", "password": "password123"}
+        )
+        assert login_resp.status_code == 200
+        token = login_resp.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Non-existent IOC ID (404)
+        non_existent_resp = client.get("/iocs/9999999", headers=headers)
+        assert non_existent_resp.status_code == 404
+        assert "Threat indicator with ID 9999999 not found" in non_existent_resp.json()["detail"]
+
+        # 2. Invalid IOC ID boundary (ge=1 enforcement -> 422)
+        invalid_id_resp = client.get("/iocs/0", headers=headers)
+        assert invalid_id_resp.status_code == 422
+
+        invalid_neg_id_resp = client.get("/iocs/-5", headers=headers)
+        assert invalid_neg_id_resp.status_code == 422
+
+        # 3. Invalid offset query parameter boundary (ge=0 enforcement -> 422)
+        invalid_offset_resp = client.get("/iocs?offset=-1", headers=headers)
+        assert invalid_offset_resp.status_code == 422
+
+        # 4. SQL wildcard character escaping test (% and _)
+        # Seed an IOC containing literal '%' and '_' in description
+        wildcard_payload = {
+            "indicator_value": "198.51.100.150",
+            "indicator_type": "ipv4",
+            "threat_type": "wildcard_test",
+            "confidence_score": 88,
+            "severity": "high",
+            "description": "Special_pattern_100%_malicious"
+        }
+        create_resp = client.post("/iocs", json=wildcard_payload, headers=headers)
+        assert create_resp.status_code == 201
+
+        # Query searching literal '%'
+        percent_search = client.get("/iocs?search=100%", headers=headers)
+        assert percent_search.status_code == 200
+        results = percent_search.json()
+        assert len(results) >= 1
+        assert any(i["indicator_value"] == "198.51.100.150" for i in results)
+
+        # Query searching literal '_'
+        underscore_search = client.get("/iocs?search=Special_pattern", headers=headers)
+        assert underscore_search.status_code == 200
+        results_underscore = underscore_search.json()
+        assert len(results_underscore) >= 1
+        assert any(i["indicator_value"] == "198.51.100.150" for i in results_underscore)
+
+        # 5. Pagination offset & limit edge case
+        all_iocs_resp = client.get("/iocs?limit=500", headers=headers)
+        assert all_iocs_resp.status_code == 200
+        total_iocs = len(all_iocs_resp.json())
+
+        # Offset equal to total count should return empty list
+        offset_beyond_resp = client.get(f"/iocs?offset={total_iocs}", headers=headers)
+        assert offset_beyond_resp.status_code == 200
+        assert offset_beyond_resp.json() == []
+
+        # Partial page with limit=2 and offset=1
+        page_resp = client.get("/iocs?limit=2&offset=1", headers=headers)
+        assert page_resp.status_code == 200
+        page_data = page_resp.json()
+        assert len(page_data) == 2
+        assert page_data[0] == all_iocs_resp.json()[1]
+
+
 if __name__ == "__main__":
     test_full_threat_intel_lifecycle()
+    test_pydantic_schema_validation_and_sanitization()
+    test_jwt_security_and_rbac_authorization()
+    test_ioc_query_and_lookup_boundary_conditions()
