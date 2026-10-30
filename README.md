@@ -17,6 +17,33 @@ docker compose up -d --build
 - **Health Check**: `http://localhost:8000/health`
 - **Interactive Swagger UI**: `http://localhost:8000/docs`
 - **Alternative ReDoc UI**: `http://localhost:8000/redoc`
+- **Full API Documentation**: See [`docs/api.md`](docs/api.md) for detailed endpoint specs, parameters, and payloads.
+
+---
+
+## 💻 Local Development & Testing
+
+If you prefer running locally without Docker:
+
+```bash
+# 1. Create and activate a Python 3.11+ virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt pytest httpx
+
+# 3. Set environment variables
+cp .env.example .env
+export DATABASE_URL="sqlite:///./test_threat_intel.db"
+export JWT_SECRET_KEY="test-secret-key-1234"
+
+# 4. Run tests
+PYTHONPATH=. pytest
+
+# 5. Launch local server
+uvicorn app.main:app --reload --port 8000
+```
 
 ---
 
@@ -82,7 +109,29 @@ curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8000/iocs?min_confid
 
 ---
 
-### 5. Ingest a New Threat Indicator (`POST /iocs`)
+### 5. Inspect Authenticated User Profile (`GET /auth/me`)
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8000/auth/me | jq .
+```
+**Response:**
+```json
+{
+  "username": "analyst",
+  "role": "threat_analyst",
+  "disabled": false
+}
+```
+
+---
+
+### 6. Get Single Threat Indicator by ID (`GET /iocs/{ioc_id}`)
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8000/iocs/1 | jq .
+```
+
+---
+
+### 7. Ingest a New Threat Indicator (`POST /iocs`)
 ```bash
 curl -s -X POST http://localhost:8000/iocs \
   -H "Authorization: Bearer $TOKEN" \
@@ -146,6 +195,8 @@ mini-threat-api/
 ├── Dockerfile               # Python 3.11-slim container with hot reloading
 ├── requirements.txt         # Production dependencies
 ├── .env.example             # Environment variable template
+├── docs/
+│   └── api.md               # Detailed API specifications and reference guide
 ├── app/
 │   ├── __init__.py
 │   ├── config.py            # Pydantic BaseSettings for config management
