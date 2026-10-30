@@ -229,6 +229,15 @@ def test_full_threat_intel_lifecycle():
         assert "jti" in decoded_token
         print("[+] JWT correctly includes iat, nbf, and jti claims.")
 
+
+        # 18. Verify Pydantic extra='forbid' prevents mass assignment
+        extra_payload = new_ioc_payload.copy()
+        extra_payload["is_admin"] = True
+        extra_resp = client.post("/iocs", json=extra_payload, headers=headers)
+        assert extra_resp.status_code == 422
+        assert "Extra inputs are not permitted" in str(extra_resp.json())
+        print("[+] Pydantic validation successfully blocked extra fields with 422.")
+
         print("\n[SUCCESS] ALL THREAT INTEL API TESTS PASSED!\n")
 
 if __name__ == "__main__":
