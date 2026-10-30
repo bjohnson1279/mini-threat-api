@@ -183,3 +183,7 @@
 **Vulnerability:** Potential Information Leakage via Stack Traces.
 **Learning:** Default unhandled exceptions might expose sensitive internal implementation details (e.g., stack traces) to the client, which attackers can use for further exploitation.
 **Prevention:** Implement a global exception handler (e.g., `@app.exception_handler(Exception)` in FastAPI) to catch unexpected errors and return a generic 500 response without exposing stack traces.
+## 2025-05-24 - Mass Assignment / Pydantic Extra Fields
+**Vulnerability:** By default, Pydantic `BaseModel` allows and ignores extra fields submitted in JSON payloads (Mass Assignment risk). While they are not inherently included in `model_dump()` unless explicitly requested, this lack of strict validation can lead to subtle bugs or security issues if the dump is used loosely, or if properties unexpectedly align with database attributes or internal application logic.
+**Learning:** Preventing unexpected fields at the validation boundary ensures cleaner, stricter data handling. Any extra fields provided by an attacker should be explicitly rejected with a 422 Unprocessable Entity instead of being silently ignored.
+**Prevention:** Apply `model_config = ConfigDict(extra="forbid")` to the base Pydantic schemas processing client input (like `IOCBase` or `IOCCreate`).
