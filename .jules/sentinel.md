@@ -183,3 +183,8 @@
 **Vulnerability:** Potential Information Leakage via Stack Traces.
 **Learning:** Default unhandled exceptions might expose sensitive internal implementation details (e.g., stack traces) to the client, which attackers can use for further exploitation.
 **Prevention:** Implement a global exception handler (e.g., `@app.exception_handler(Exception)` in FastAPI) to catch unexpected errors and return a generic 500 response without exposing stack traces.
+
+## 2026-10-31 - Forbid extra fields on Pydantic schemas (Mass Assignment & Parameter Pollution)
+**Vulnerability:** The threat indicator API accepted unexpected or extra payload fields without rejection, creating risks of Mass Assignment and HTTP parameter pollution.
+**Learning:** In Pydantic v2, setting `model_config = ConfigDict(extra="forbid")` on base request models ensures any unmapped or unexpected properties immediately trigger a 422 validation error.
+**Prevention:** Always declare `extra="forbid"` on base API input schemas handling state modifications.
