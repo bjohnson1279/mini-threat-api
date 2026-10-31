@@ -17,6 +17,44 @@ docker compose up -d --build
 - **Health Check**: `http://localhost:8000/health`
 - **Interactive Swagger UI**: `http://localhost:8000/docs`
 - **Alternative ReDoc UI**: `http://localhost:8000/redoc`
+- **Full API Documentation**: See [`docs/api/reference.md`](docs/api/reference.md)
+
+---
+
+## 💻 Local Development Setup (Without Docker)
+
+### Prerequisites
+- Python 3.11+
+- Virtual environment (`venv`)
+
+### Setup Instructions
+1. **Clone the repository and prepare the environment configuration:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Create and activate a virtual environment:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Run the API server locally:**
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+5. **Run test suite:**
+   ```bash
+   export DATABASE_URL="sqlite:///./test_threat_intel.db"
+   export JWT_SECRET_KEY="test-secret-key-1234"
+   PYTHONPATH=. pytest tests/
+   ```
 
 ---
 
@@ -78,11 +116,28 @@ TOKEN=$(curl -s -X POST http://localhost:8000/auth/token -d "username=analyst&pa
 
 # Query indicators with confidence >= 80:
 curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8000/iocs?min_confidence=80" | jq .
+
+# Query indicators with keyword search and pagination:
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8000/iocs?search=LockBit&limit=10&offset=0" | jq .
 ```
 
 ---
 
-### 5. Ingest a New Threat Indicator (`POST /iocs`)
+### 5. Retrieve an Indicator by ID (`GET /iocs/{ioc_id}`)
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8000/iocs/1 | jq .
+```
+
+---
+
+### 6. Inspect Authenticated User Profile (`GET /auth/me`)
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8000/auth/me | jq .
+```
+
+---
+
+### 7. Ingest a New Threat Indicator (`POST /iocs`)
 ```bash
 curl -s -X POST http://localhost:8000/iocs \
   -H "Authorization: Bearer $TOKEN" \
@@ -146,6 +201,9 @@ mini-threat-api/
 ├── Dockerfile               # Python 3.11-slim container with hot reloading
 ├── requirements.txt         # Production dependencies
 ├── .env.example             # Environment variable template
+├── docs/
+│   └── api/
+│       └── reference.md     # Detailed API endpoint reference & schemas
 ├── app/
 │   ├── __init__.py
 │   ├── config.py            # Pydantic BaseSettings for config management
