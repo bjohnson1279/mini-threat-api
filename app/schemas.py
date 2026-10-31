@@ -11,6 +11,10 @@ SeverityEnum = Literal["low", "medium", "high", "critical"]
 
 class IOCBase(BaseModel):
     """Base Pydantic schema with shared threat indicator attributes."""
+
+    # 🛡️ Sentinel Security Enhancement: Forbid extra fields to prevent HTTP Parameter Pollution and Mass Assignment
+    model_config = ConfigDict(extra="forbid")
+
     indicator_value: str = Field(..., max_length=255, json_schema_extra={"example": "198.51.100.24"}, description="The observable IP, domain, or hash")
     indicator_type: IndicatorTypeEnum = Field(..., json_schema_extra={"example": "ipv4"}, description="Classification of the IOC")
     threat_type: str = Field(..., max_length=100, json_schema_extra={"example": "ransomware_c2"}, description="Category of malicious activity")

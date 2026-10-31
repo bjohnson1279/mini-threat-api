@@ -183,3 +183,7 @@
 **Vulnerability:** Potential Information Leakage via Stack Traces.
 **Learning:** Default unhandled exceptions might expose sensitive internal implementation details (e.g., stack traces) to the client, which attackers can use for further exploitation.
 **Prevention:** Implement a global exception handler (e.g., `@app.exception_handler(Exception)` in FastAPI) to catch unexpected errors and return a generic 500 response without exposing stack traces.
+## 2025-05-23 - HTTP Parameter Pollution and Mass Assignment
+**Vulnerability:** Pydantic models (like `IOCBase` and `IOCCreate`) did not explicitly forbid extra fields. This could lead to HTTP Parameter Pollution and Mass Assignment vulnerabilities where attackers send unexpected fields in the request body that are silently ignored but might bypass security checks, cause logic errors downstream, or unexpectedly modify data if the ORM allows it.
+**Learning:** By default, Pydantic silently ignores extra fields not defined in the schema. In security-sensitive APIs, rejecting unexpected input is crucial to ensure data integrity and prevent parameter pollution.
+**Prevention:** Always explicitly set `model_config = ConfigDict(extra="forbid")` on base models that process client input to ensure unexpected fields result in a `422 Unprocessable Entity` rather than being silently ignored.
