@@ -1,9 +1,11 @@
+import time
 import pytest
 from jose import jwt
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.main import app, LOGIN_ATTEMPTS, LOGIN_ATTEMPTS_LOCK
+from app.database import get_db
 from app.config import settings
 from app.schemas import IOCCreate
 from app.auth import create_access_token, MOCK_USERS_DB
@@ -119,6 +121,10 @@ class TestIOCValidationEdgeCases:
         assert "&lt;script&gt;" in ioc.threat_type
         assert "<img src=x" not in ioc.description
         assert "&lt;img src=x" in ioc.description
+
+        # Non-string or None inputs handled cleanly
+        assert IOCCreate.sanitize_html(None) is None
+        assert IOCCreate.sanitize_html(123) == 123
 
     def test_confidence_score_boundaries(self):
         # Assert lower boundary 0 and upper boundary 100 succeed
@@ -355,3 +361,133 @@ class TestQueryAndPaginationEdgeCases:
             # min_confidence > 100
             res_over = client.get("/iocs?min_confidence=101", headers=auth_headers)
             assert res_over.status_code == 422
+
+    def test_search_parameter_length_boundary(self, auth_headers):
+        # Arrange & Act: search with length boundary (max_length=255)
+        with TestClient(app) as client:
+            # Exactly 255 chars succeeds
+            res_valid = client.get(f"/iocs?search={'a' * 255}", headers=auth_headers)
+            assert res_valid.status_code == 200
+
+            # 256 chars fails with 422
+            res_invalid = client.get(f"/iocs?search={'a' * 256}", headers=auth_headers)
+            assert res_invalid.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Integration Tests: System, Security Handlers & Rate Limiter Boundaries
+# ---------------------------------------------------------------------------
+
+class TestSystemAndSecurityBoundaries:
+    """Test suite targeting global error handling, rate limiter store edge cases, and audit logging."""
+
+    def test_global_exception_handler_returns_500_and_sanitizes_stack_trace(self):
+        # Arrange: simulate an unhandled server error during request execution using dependency_overrides
+        def broken_get_db():
+            raise RuntimeError("Unexpected catastrophic database driver failure")
+
+        app.dependency_overrides[get_db] = broken_get_db
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                token = create_access_token(data={"sub": "analyst", "role": "threat_analyst"})
+                headers = {"Authorization": f"Bearer {token}"}
+
+                # Act: trigger an endpoint that depends on get_db
+                response = client.get("/iocs", headers=headers)
+
+                # Assert: returns 500 with sanitized generic message rather than leaking trace
+                assert response.status_code == 500
+                assert response.json() == {"detail": "Internal server error"}
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_rate_limiter_store_capacity_exhaustion(self):
+        # Arrange: fill rate limiter store up to MAX_LOGIN_ATTEMPTS_STORE_SIZE
+        import app.main as main_mod
+        with main_mod.LOGIN_ATTEMPTS_LOCK:
+            main_mod.LOGIN_ATTEMPTS.clear()
+            # Populate store up to capacity with dummy IPs
+            for i in range(main_mod.MAX_LOGIN_ATTEMPTS_STORE_SIZE):
+                main_mod.LOGIN_ATTEMPTS[f"10.0.{i // 256}.{i % 256}"] = [time.time()]
+
+        with TestClient(app) as client:
+            # Act: attempt login from a new client IP not already in store
+            response = client.post(
+                "/auth/token",
+                data={"username": "analyst", "password": "password123"}
+            )
+            # Assert: 429 Too Many Requests due to store capacity limit
+            assert response.status_code == 429
+            assert "Service is currently experiencing high load" in response.json()["detail"]
+
+    def test_rate_limiter_periodic_cleanup_evicts_stale_records(self):
+        # Arrange: set up stale attempts and simulate elapsed time > 300s
+        import app.main as main_mod
+        old_time = time.time() - 400
+        active_time = time.time() - 10
+        with main_mod.LOGIN_ATTEMPTS_LOCK:
+            main_mod.LOGIN_ATTEMPTS.clear()
+            main_mod.LOGIN_ATTEMPTS["192.0.2.1"] = [old_time]
+            main_mod.LOGIN_ATTEMPTS["192.0.2.2"] = [old_time, active_time]
+            main_mod.LAST_CLEANUP_TIME = time.time() - 350
+
+        with TestClient(app) as client:
+            # Act: trigger a login request which initiates throttled cleanup
+            response = client.post(
+                "/auth/token",
+                data={"username": "analyst", "password": "password123"}
+            )
+            assert response.status_code == 200
+            # Assert: stale entry was evicted and partially active entry was filtered
+            with main_mod.LOGIN_ATTEMPTS_LOCK:
+                assert "192.0.2.1" not in main_mod.LOGIN_ATTEMPTS
+                assert len(main_mod.LOGIN_ATTEMPTS["192.0.2.2"]) == 1
+
+    def test_rbac_audit_logging_on_unauthorized_access(self, caplog):
+        # Arrange: login as guest user without threat_analyst permissions
+        import logging
+        with TestClient(app) as client:
+            login_resp = client.post(
+                "/auth/token",
+                data={"username": "guest", "password": "password123"}
+            )
+            assert login_resp.status_code == 200
+            guest_token = login_resp.json()["access_token"]
+            headers = {"Authorization": f"Bearer {guest_token}"}
+
+            payload = {
+                "indicator_value": "198.51.100.42",
+                "indicator_type": "ipv4",
+                "threat_type": "c2",
+                "confidence_score": 85,
+                "severity": "high"
+            }
+
+            # Act: attempt unauthorized IOC creation while capturing audit logs
+            with caplog.at_level(logging.WARNING, logger="audit"):
+                response = client.post("/iocs", json=payload, headers=headers)
+
+            # Assert
+            assert response.status_code == 403
+            assert any(
+                "Unauthorized access attempt by user 'guest'" in record.message
+                for record in caplog.records
+            )
+
+    def test_ipv4_validation_invalid_octets(self):
+        # Arrange & Act: test invalid IPv4 values (octet > 255, non-numeric octet, missing octet)
+        with pytest.raises(ValidationError) as exc1:
+            IOCCreate(
+                indicator_value="256.100.0.1",
+                indicator_type="ipv4",
+                threat_type="c2"
+            )
+        assert "Invalid IPv4 address format" in str(exc1.value)
+
+        with pytest.raises(ValidationError) as exc2:
+            IOCCreate(
+                indicator_value="192.168.1",
+                indicator_type="ipv4",
+                threat_type="c2"
+            )
+        assert "Invalid IPv4 address format" in str(exc2.value)
