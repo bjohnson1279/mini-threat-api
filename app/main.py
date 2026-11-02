@@ -227,7 +227,7 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     summary="Query Threat Intelligence Indicators"
 )
 def list_iocs(
-    indicator_type: Optional[str] = Query(None, max_length=50, description="Filter by type (ipv4, domain, sha256, url)"),
+    indicator_type: Optional[str] = Query(None, max_length=50, description="Filter by type (ipv4, domain, sha256, url, email)"),
     min_confidence: Optional[int] = Query(0, ge=0, le=100, description="Minimum confidence score threshold (0-100)"),
     search: Optional[str] = Query(None, max_length=255, description="Partial search within indicator value or description"),
     limit: int = Query(50, ge=1, le=500, description="Maximum records to return"),
