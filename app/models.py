@@ -24,7 +24,7 @@ class Indicator(Base):
     # ⚡ Bolt Optimization: Removed redundant `index=True` from `indicator_type` and `is_active`
     # `indicator_type` already serves as the leftmost prefix of `ix_indicators_type_confidence`.
     # `is_active` is a low-cardinality boolean column. Standalone indexes for these degrade write performance.
-    indicator_type = Column(String(50), nullable=False)                # ipv4, domain, sha256, url
+    indicator_type = Column(String(50), nullable=False)                # ipv4, domain, sha256, url, email
     threat_type = Column(String(100), nullable=False)                  # c2_server, phishing, ransomware
     confidence_score = Column(Integer, nullable=False, default=50)      # 0 to 100
     severity = Column(String(20), nullable=False, default="medium")    # low, medium, high, critical
