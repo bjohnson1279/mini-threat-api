@@ -32,6 +32,7 @@ docker compose up -d --build
    ```bash
    cp .env.example .env
    ```
+   *Note: Environment variables in `.env` include `DATABASE_URL`, `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, and `CORS_ORIGINS` (comma-separated allowed origins, defaulting to `http://localhost:8000`).*
 
 2. **Create and activate a virtual environment:**
    ```bash
