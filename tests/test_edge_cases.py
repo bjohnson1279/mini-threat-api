@@ -237,6 +237,57 @@ class TestAuthAndTokensEdgeCases:
             assert response.status_code == 401
             assert "Could not validate credentials or token expired" in response.json()["detail"]
 
+    def test_expired_jwt_token_returns_401(self):
+        # Arrange: create a token with expiration in the past
+        with TestClient(app) as client:
+            past_exp = int(time.time()) - 100
+            expired_token = jwt.encode(
+                {"sub": "analyst", "role": "threat_analyst", "exp": past_exp},
+                settings.JWT_SECRET_KEY,
+                algorithm=settings.JWT_ALGORITHM
+            )
+            headers = {"Authorization": f"Bearer {expired_token}"}
+
+            # Act
+            response = client.get("/auth/me", headers=headers)
+
+            # Assert
+            assert response.status_code == 401
+            assert "Could not validate credentials or token expired" in response.json()["detail"]
+
+    def test_auth_token_input_length_boundaries(self):
+        # Arrange & Act: test boundaries around max_length for username (255) and password (1024)
+        with TestClient(app) as client:
+            # 255-char username (valid length, though unknown user -> 401)
+            resp_user_valid = client.post(
+                "/auth/token",
+                data={"username": "u" * 255, "password": "password123"}
+            )
+            assert resp_user_valid.status_code == 401
+
+            # 256-char username (exceeds limit -> 400 Bad Request)
+            resp_user_invalid = client.post(
+                "/auth/token",
+                data={"username": "u" * 256, "password": "password123"}
+            )
+            assert resp_user_invalid.status_code == 400
+            assert "payload too large" in resp_user_invalid.json()["detail"]
+
+            # 1024-char password (valid length -> 401)
+            resp_pass_valid = client.post(
+                "/auth/token",
+                data={"username": "analyst", "password": "p" * 1024}
+            )
+            assert resp_pass_valid.status_code == 401
+
+            # 1025-char password (exceeds limit -> 400 Bad Request)
+            resp_pass_invalid = client.post(
+                "/auth/token",
+                data={"username": "analyst", "password": "p" * 1025}
+            )
+            assert resp_pass_invalid.status_code == 400
+            assert "payload too large" in resp_pass_invalid.json()["detail"]
+
     def test_admin_role_can_create_ioc(self):
         # Arrange: login as admin who has role "admin", should satisfy require_role("threat_analyst")
         with TestClient(app) as client:
@@ -373,6 +424,22 @@ class TestQueryAndPaginationEdgeCases:
             res_invalid = client.get(f"/iocs?search={'a' * 256}", headers=auth_headers)
             assert res_invalid.status_code == 422
 
+    def test_indicator_type_case_insensitivity_and_multi_filter(self, auth_headers):
+        # Arrange & Act: indicator_type query parameter should be case-insensitive (e.g. IPV4, Domain)
+        with TestClient(app) as client:
+            res_upper = client.get("/iocs?indicator_type=IPV4", headers=auth_headers)
+            assert res_upper.status_code == 200
+            results = res_upper.json()
+            assert len(results) >= 1
+            assert all(ioc["indicator_type"] == "ipv4" for ioc in results)
+
+            # Combined multi-criteria filter: indicator_type + min_confidence
+            res_combined = client.get("/iocs?indicator_type=ipv4&min_confidence=90", headers=auth_headers)
+            assert res_combined.status_code == 200
+            combined_results = res_combined.json()
+            assert len(combined_results) >= 1
+            assert all(ioc["indicator_type"] == "ipv4" and ioc["confidence_score"] >= 90 for ioc in combined_results)
+
 
 # ---------------------------------------------------------------------------
 # Integration Tests: System, Security Handlers & Rate Limiter Boundaries
@@ -491,3 +558,22 @@ class TestSystemAndSecurityBoundaries:
                 threat_type="c2"
             )
         assert "Invalid IPv4 address format" in str(exc2.value)
+
+    def test_seed_threat_data_idempotency(self):
+        # Arrange & Act: calling seed_threat_data when indicators already exist does not re-insert duplicates
+        from app.seed import seed_threat_data
+        from app.models import Indicator
+        db_generator = get_db()
+        db = next(db_generator)
+        try:
+            initial_count = db.query(Indicator).count()
+            assert initial_count > 0
+
+            # Act: trigger seed_threat_data again
+            seed_threat_data(db)
+            new_count = db.query(Indicator).count()
+
+            # Assert: count remained identical (idempotent)
+            assert new_count == initial_count
+        finally:
+            db.close()
