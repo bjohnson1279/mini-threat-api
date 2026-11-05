@@ -1,4 +1,5 @@
 import os
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -6,7 +7,7 @@ class Settings(BaseSettings):
         "DATABASE_URL", 
         "sqlite:///./threat_intel.db"
     )
-    JWT_SECRET_KEY: str
+    JWT_SECRET_KEY: str = Field(..., min_length=32)
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:8000")
