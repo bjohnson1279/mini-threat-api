@@ -53,7 +53,7 @@ docker compose up -d --build
 5. **Run test suite:**
    ```bash
    export DATABASE_URL="sqlite:///./test_threat_intel.db"
-   export JWT_SECRET_KEY="test-secret-key-1234"
+   export JWT_SECRET_KEY="test-secret-key-1234-5678-9012-3456"
    PYTHONPATH=. pytest tests/
    ```
 
