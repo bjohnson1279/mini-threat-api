@@ -1,3 +1,10 @@
+"""
+Mini Threat-Intel API core application module.
+Configures FastAPI routes, security and compression middlewares, authentication
+endpoints, and threat indicator (IOC) ingestion/query handlers.
+See /docs/api/reference.md for full endpoint and schema documentation.
+"""
+
 from contextlib import asynccontextmanager
 from typing import List, Optional
 import time
@@ -103,15 +110,13 @@ LAST_CLEANUP_TIME = time.time()
 MAX_LOGIN_ATTEMPTS_STORE_SIZE = 10000
 LOGIN_ATTEMPTS_LOCK = threading.Lock()
 
-@app.get("/health", tags=["System"])
+@app.get("/health", tags=["System"], summary="Health Check")
 async def health_check():
     """Health check endpoint to verify service and container liveness."""
-    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
-    # Since this endpoint does not perform blocking I/O operations (like synchronous DB queries),
-    # using `async def` avoids FastAPI's threadpool context switch overhead, significantly improving throughput.
+    # ⚡ Bolt: `async def` avoids threadpool context-switching for non-blocking handler
     return {"status": "healthy", "service": "threat-intel-api"}
 
-@app.post("/auth/token", response_model=Token, tags=["Authentication"])
+@app.post("/auth/token", response_model=Token, tags=["Authentication"], summary="Login for Access Token")
 def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     """
     OAuth2 compatible token login endpoint.
@@ -120,13 +125,9 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
       - username: 'analyst', password: 'password123'
       - username: 'admin', password: 'adminpassword123'
 
-    ⚡ Bolt Optimization:
-    Declared as `def` to run in a threadpool instead of the event loop.
-    This avoids blocking the main event loop since `bcrypt.checkpw()` is a CPU-bound
-    operation that would otherwise delay all concurrent requests.
+    ⚡ Bolt: Sync `def` executes in threadpool to keep CPU-bound bcrypt off event loop.
     """
-    # 🛡️ Sentinel Security Enhancement: Prevent Payload/Regex DoS by bounding form data length
-    # OAuth2PasswordRequestForm lacks native length limits, allowing memory exhaustion or long processing times.
+    # 🛡️ Sentinel: Enforce max payload bounds to prevent Payload/Regex DoS
     if len(form_data.username) > 255 or len(form_data.password) > 1024:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -134,8 +135,7 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 🛡️ Sentinel Security Fix: Implement basic IP-based rate limiting to prevent brute-force DoS
-    # and Memory Exhaustion DoS
+    # 🛡️ Sentinel: IP-based sliding-window rate limiting to deter brute force
     global LAST_CLEANUP_TIME
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
@@ -143,7 +143,7 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     # Throttled cleanup every 5 minutes (300 seconds) to prevent Memory Exhaustion
     if now - LAST_CLEANUP_TIME > 300:
         LAST_CLEANUP_TIME = now
-        # ⚡ Bolt Optimization: Precompute cutoff timestamp to avoid redundant subtraction in loop.
+        # ⚡ Bolt: Precompute cutoff timestamp once outside the iteration loop
         cutoff = now - 60
         with LOGIN_ATTEMPTS_LOCK:
             for ip in list(LOGIN_ATTEMPTS.keys()):
@@ -178,11 +178,7 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
 
     user_dict = MOCK_USERS_DB.get(form_data.username)
 
-    # 🛡️ Sentinel Security Fix:
-    # Always perform a bcrypt check to prevent timing attacks for user enumeration.
-    # If the user doesn't exist, we check the password against a dummy hash so it
-    # takes roughly the same amount of time as checking a real user's password.
-    # Dummy hash uses a static pre-computed bcrypt hash string.
+    # 🛡️ Sentinel: Constant-time dummy bcrypt check prevents user enumeration timing attacks
     dummy_hash = b"$2b$12$v1B3NFjxLnulAxo8hmmE8.wX7DP7pExSaVPCDr74ERGYQm3lkjqc6"
 
     user_exists = user_dict is not None and not user_dict.get("disabled", False)
@@ -190,9 +186,7 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
 
     password_bytes = form_data.password.encode('utf-8')
 
-    # 🛡️ Sentinel Security Fix:
-    # Prevent DoS (ValueError) from bcrypt if password exceeds 72 bytes.
-    # We still perform the check with a truncated password to maintain constant time.
+    # 🛡️ Sentinel: Prevent bcrypt 72-byte ValueError DoS while preserving constant-time checks
     if len(password_bytes) > 72:
         bcrypt.checkpw(password_bytes[:72], hash_to_check)
         password_matches = False
@@ -244,8 +238,7 @@ def list_iocs(
     - SQLAlchemy query filtering and execution
     - Pydantic serialization (`response_model=List[IOCResponse]`)
     """
-    # ⚡ Bolt Optimization: Skip redundant filter evaluation when min_confidence is 0 (default).
-    # Since confidence scores are inherently >= 0, adding the WHERE clause for 0 causes unnecessary evaluation.
+    # ⚡ Bolt: Skip redundant WHERE evaluation when min_confidence is default 0
     query = db.query(Indicator)
     if min_confidence > 0:
         query = query.filter(Indicator.confidence_score >= min_confidence)
@@ -254,10 +247,7 @@ def list_iocs(
         query = query.filter(Indicator.indicator_type == indicator_type.lower())
     
     if search:
-        # 🛡️ Sentinel Security Fix:
-        # Prevent SQL LIKE Wildcard Injection (Denial of Service) by escaping wildcards,
-        # which otherwise allows attackers to submit overly complex wildcard patterns
-        # that consume excessive database CPU resources.
+        # 🛡️ Sentinel: Escape SQL LIKE wildcards to prevent wildcard injection DoS
         escaped_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         search_pattern = f"%{escaped_search}%"
         query = query.filter(
@@ -265,9 +255,7 @@ def list_iocs(
             (Indicator.description.ilike(search_pattern, escape="\\"))
         )
         
-    # ⚡ Bolt Optimization: Add offset to support full pagination for large datasets
-    # Querying large datasets without pagination can cause memory exhaustion and slow response times.
-    # Adding `offset` in conjunction with `limit` ensures efficient retrieval of partial results.
+    # ⚡ Bolt: Support offset pagination to prevent memory exhaustion on large datasets
     indicators = query.order_by(Indicator.confidence_score.desc()).offset(offset).limit(limit).all()
     return indicators
 
@@ -283,9 +271,7 @@ def get_ioc_by_id(
     current_user: User = Depends(get_current_user)
 ):
     """Retrieves a single threat indicator by its database primary key."""
-    # ⚡ Bolt Optimization: Replace db.query(Model).filter(Model.id == id).first() with db.get(Model, id)
-    # Using db.get() avoids the overhead of compiling a filter expression and will return
-    # instantly from the SQLAlchemy Identity Map if the object is already loaded, avoiding a DB query entirely.
+    # ⚡ Bolt: db.get() checks Identity Map before query and avoids filter compile overhead
     indicator = db.get(Indicator, ioc_id)
     if not indicator:
         raise HTTPException(
@@ -317,9 +303,8 @@ def create_ioc(
     logger.info(f"User {current_user.username} ingested new IOC: {ioc_in.indicator_value} (Type: {ioc_in.indicator_type})")
     return new_ioc
 
-@app.get("/auth/me", response_model=User, tags=["Authentication"])
+@app.get("/auth/me", response_model=User, tags=["Authentication"], summary="Read Current User Profile")
 async def read_current_user_profile(current_user: User = Depends(get_current_user)):
     """Returns the authenticated user identity and claims decoded from the JWT."""
-    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
-    # Using `async def` avoids running this non-blocking endpoint in a threadpool, decreasing overhead.
+    # ⚡ Bolt: `async def` avoids threadpool context switch overhead for non-blocking endpoint
     return current_user
