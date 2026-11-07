@@ -146,12 +146,12 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
         # ⚡ Bolt: Precompute cutoff timestamp once outside the iteration loop
         cutoff = now - 60
         with LOGIN_ATTEMPTS_LOCK:
-            for ip in list(LOGIN_ATTEMPTS.keys()):
-                ip_attempts = LOGIN_ATTEMPTS.get(ip, [])
+            # ⚡ Bolt: Avoid redundant dict.get() and .pop() overhead during lock-bound cleanup loop
+            for ip, ip_attempts in list(LOGIN_ATTEMPTS.items()):
                 valid_attempts = [t for t in ip_attempts if t > cutoff]
                 if not valid_attempts:
-                    LOGIN_ATTEMPTS.pop(ip, None)
-                else:
+                    del LOGIN_ATTEMPTS[ip]
+                elif len(valid_attempts) != len(ip_attempts):
                     LOGIN_ATTEMPTS[ip] = valid_attempts
 
     # Enforce global capacity limit to prevent unbounded growth during massive bursts
