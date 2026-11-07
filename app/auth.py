@@ -1,3 +1,9 @@
+"""
+Authentication and authorization module for Mini Threat-Intel API.
+Handles JWT creation, cryptographic token verification, user dependency injection,
+and role-based access control (RBAC) guard factories.
+"""
+
 from datetime import datetime, timedelta, timezone
 import uuid
 from typing import Optional
@@ -10,11 +16,10 @@ from app.schemas import TokenData, User
 
 logger = logging.getLogger("audit")
 
-# OAuth2PasswordBearer tells FastAPI that the client should send the token
-# in the 'Authorization: Bearer <token>' header, and documents this in Swagger UI.
+# OAuth2 scheme requiring Bearer token in the 'Authorization' header
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
-# Mock user database for the interview demo
+# Mock user database for authentication demo
 MOCK_USERS_DB = {
     "analyst": {
         "username": "analyst",
@@ -45,10 +50,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     now = datetime.now(timezone.utc)
     expire = now + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
 
-    # 🛡️ Sentinel Security Enhancement: Add standard JWT claims
-    # iat (Issued At): When the token was created
-    # nbf (Not Before): Token is not valid before this time
-    # jti (JWT ID): Unique identifier for the token to prevent replay attacks
+    # Include standard JWT claims (iat, nbf, jti) for security tracking
     to_encode.update({
         "exp": expire,
         "iat": now,
@@ -61,9 +63,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 def decode_access_token(token: str) -> TokenData:
     """Decodes and verifies a JWT token's signature and expiration."""
     try:
-        # 🛡️ Sentinel Security Fix:
-        # Enforce the presence of 'exp' and 'sub' claims in the JWT payload.
-        # This prevents attacks where adversaries omit the 'exp' claim to create tokens that never expire.
+        # Require 'exp' and 'sub' claims to prevent perpetual non-expiring tokens
         payload = jwt.decode(
             token,
             settings.JWT_SECRET_KEY,
@@ -109,11 +109,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 
 def require_role(required_role: str):
     """Role-based access control (RBAC) dependency factory."""
-    # ⚡ Bolt Optimization: Changed from `def` to `async def`.
-    # Using `async def` avoids running this non-blocking endpoint in a threadpool, decreasing overhead.
+    # Non-blocking async dependency runs on event loop avoiding threadpool overhead
     async def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role != required_role and current_user.role != "admin":
-            # 🛡️ Sentinel Security Fix: Audit log RBAC failures
+            # Sanitize username against CRLF injection and emit RBAC audit log
             safe_username = current_user.username.replace('\n', '\\n').replace('\r', '\\r')
             logger.warning(f"Audit: Unauthorized access attempt by user '{safe_username}' (role: {current_user.role}) requiring role '{required_role}'")
             raise HTTPException(
