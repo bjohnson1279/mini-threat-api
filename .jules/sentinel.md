@@ -188,3 +188,7 @@
 **Vulnerability:** The threat indicator API accepted unexpected or extra payload fields without rejection, creating risks of Mass Assignment and HTTP parameter pollution.
 **Learning:** In Pydantic v2, setting `model_config = ConfigDict(extra="forbid")` on base request models ensures any unmapped or unexpected properties immediately trigger a 422 validation error.
 **Prevention:** Always declare `extra="forbid"` on base API input schemas handling state modifications.
+## 2025-05-18 - Missing COOP and CORP Security Headers
+**Vulnerability:** The API lacked `Cross-Origin-Opener-Policy` (COOP) and `Cross-Origin-Resource-Policy` (CORP) headers. This could allow for cross-origin information leaks, opening up vectors for side-channel attacks like Spectre against modern browser clients interacting with the API.
+**Learning:** For a robust defense-in-depth posture, specifically to mitigate cross-origin attacks in web applications, COOP and CORP must be set alongside other standard security headers.
+**Prevention:** Always implement `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Resource-Policy: same-origin` in the global HTTP middleware.
