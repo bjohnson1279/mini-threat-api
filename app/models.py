@@ -1,3 +1,9 @@
+"""
+SQLAlchemy ORM models for the Threat Intelligence service.
+Defines the Indicator entity with optimized indexes for indicator lookup,
+type-confidence composite filtering, and confidence score sorting.
+"""
+
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Index
 from app.database import Base
@@ -15,15 +21,10 @@ class Indicator(Base):
     """
     __tablename__ = "indicators"
 
-    # ⚡ Bolt Optimization: Removed redundant `index=True` from primary key
-    # `primary_key=True` automatically creates a unique B-tree index in relational DBs.
-    # Adding `index=True` explicitly creates a second, completely redundant index on the
-    # same column, which wastes storage and degrades INSERT/UPDATE performance.
+    # primary_key=True already creates a unique index; explicit index=True is omitted to avoid duplicate indexes.
     id = Column(Integer, primary_key=True, autoincrement=True)
     indicator_value = Column(String(255), nullable=False, index=True)  # e.g. IP, domain, hash
-    # ⚡ Bolt Optimization: Removed redundant `index=True` from `indicator_type` and `is_active`
-    # `indicator_type` already serves as the leftmost prefix of `ix_indicators_type_confidence`.
-    # `is_active` is a low-cardinality boolean column. Standalone indexes for these degrade write performance.
+    # Standalone index omitted: indicator_type is the prefix in ix_indicators_type_confidence.
     indicator_type = Column(String(50), nullable=False)                # ipv4, domain, sha256, url, email
     threat_type = Column(String(100), nullable=False)                  # c2_server, phishing, ransomware
     confidence_score = Column(Integer, nullable=False, default=50)      # 0 to 100
@@ -35,10 +36,6 @@ class Indicator(Base):
 
     __table_args__ = (
         Index("ix_indicators_type_confidence", "indicator_type", "confidence_score"),
-        # ⚡ Bolt Optimization:
-        # Added dedicated index on confidence_score to speed up /iocs queries
-        # when 'indicator_type' filter is not provided. The previous composite index
-        # couldn't be used effectively without the leftmost prefix.
-        # This reduces query time significantly for those queries.
+        # Accelerates confidence-only queries when indicator_type prefix is absent.
         Index("ix_indicators_confidence_score", "confidence_score"),
     )
