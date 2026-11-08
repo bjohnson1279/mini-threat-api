@@ -7,6 +7,7 @@ and role-based access control (RBAC) guard factories.
 from datetime import datetime, timedelta, timezone
 import uuid
 from typing import Optional
+from functools import lru_cache
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import logging
@@ -60,16 +61,33 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
+@lru_cache(maxsize=1024)
+def _verify_and_decode_jwt(token: str, secret: str, algorithm: str) -> dict:
+    """
+    ⚡ Bolt Optimization: Cache JWT signature verification and decoding.
+    Cryptographic signature verification is extremely CPU intensive. By caching the
+    result, we avoid re-computing the HMAC/RSA check on every single API request
+    for the same token. We disable the internal expiration check in python-jose
+    and perform it manually so that the cache doesn't return expired tokens.
+    """
+    return jwt.decode(
+        token,
+        secret,
+        algorithms=[algorithm],
+        options={"require_exp": True, "require_sub": True, "verify_exp": False}
+    )
+
 def decode_access_token(token: str) -> TokenData:
     """Decodes and verifies a JWT token's signature and expiration."""
     try:
         # Require 'exp' and 'sub' claims to prevent perpetual non-expiring tokens
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM],
-            options={"require_exp": True, "require_sub": True}
-        )
+        payload = _verify_and_decode_jwt(token, settings.JWT_SECRET_KEY, settings.JWT_ALGORITHM)
+
+        # Manually check expiration since it's disabled in the cached decode
+        exp = payload.get("exp")
+        if exp and datetime.now(timezone.utc).timestamp() > exp:
+            raise JWTError("Token expired")
+
         username: str = payload.get("sub")
         role: str = payload.get("role")
         if username is None:
