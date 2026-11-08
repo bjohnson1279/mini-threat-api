@@ -111,3 +111,7 @@
 ## 2024-11-20 - Use bulk_save_objects over add_all for bulk inserts
 **Learning:** In SQLAlchemy, `Session.add_all()` simply iterates over the collection and calls `Session.add()` for each item internally, meaning it does not perform a true batch insert at the database level and still incurs the overhead of ORM state management.
 **Action:** For genuine bulk data ingestion performance improvements, use `session.bulk_save_objects()` or an `insert().values()` construct instead of `db.add_all()`.
+
+## 2024-11-20 - Use dict.items() and del instead of keys(), get(), and pop() in hot paths
+**Learning:** When iterating over a dictionary to clean up entries (e.g. rate limit tracking), using `list(dict.keys())` combined with `.get(key)` inside the loop incurs redundant dictionary lookup overhead. Additionally, unconditionally re-assigning values or using `.pop(key, None)` when the key is guaranteed to exist adds unnecessary mutation overhead.
+**Action:** Use `for key, value in list(dict.items()):` to fetch keys and values simultaneously. Use `del dict[key]` to remove entries when the key is known to exist, and only re-assign values if they have actually changed (e.g., `len(new_val) != len(old_val)`).
