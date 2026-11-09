@@ -14,9 +14,10 @@ docker compose up -d --build
 ```
 
 ### 2. Verify Health & OpenAPI Docs
-- **Health Check**: `http://localhost:8000/health`
-- **Interactive Swagger UI**: `http://localhost:8000/docs`
-- **Alternative ReDoc UI**: `http://localhost:8000/redoc`
+*Note: Docker Compose forwards host port `5200` (or `${PORT:-5200}`) to container port `8000`.*
+- **Health Check**: `http://localhost:5200/health`
+- **Interactive Swagger UI**: `http://localhost:5200/docs`
+- **Alternative ReDoc UI**: `http://localhost:5200/redoc`
 - **Full API Documentation**: See [`docs/api/reference.md`](docs/api/reference.md)
 
 ---
@@ -52,6 +53,7 @@ docker compose up -d --build
 
 5. **Run test suite:**
    ```bash
+   rm -f test_threat_intel.db
    export DATABASE_URL="sqlite:///./test_threat_intel.db"
    export JWT_SECRET_KEY="test-secret-key-1234-5678-9012-3456"
    PYTHONPATH=. pytest tests/
@@ -60,6 +62,8 @@ docker compose up -d --build
 ---
 
 ## 🧪 Testing the API via cURL
+
+*(Examples below assume the local server running on port `8000`. If running via Docker Compose, substitute `8000` with `5200`.)*
 
 ### 1. Health Check (Unauthenticated)
 ```bash
@@ -205,6 +209,10 @@ mini-threat-api/
 ├── docs/
 │   └── api/
 │       └── reference.md     # Detailed API endpoint reference & schemas
+├── tests/
+│   ├── conftest.py          # Pytest fixtures and environment configuration
+│   ├── test_api.py          # Core lifecycle and functional integration tests
+│   └── test_edge_cases.py   # Boundary, validation, and security edge case tests
 ├── app/
 │   ├── __init__.py
 │   ├── config.py            # Pydantic BaseSettings for config management
