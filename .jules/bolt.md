@@ -115,3 +115,7 @@
 ## 2024-11-20 - Use dict.items() and del instead of keys(), get(), and pop() in hot paths
 **Learning:** When iterating over a dictionary to clean up entries (e.g. rate limit tracking), using `list(dict.keys())` combined with `.get(key)` inside the loop incurs redundant dictionary lookup overhead. Additionally, unconditionally re-assigning values or using `.pop(key, None)` when the key is guaranteed to exist adds unnecessary mutation overhead.
 **Action:** Use `for key, value in list(dict.items()):` to fetch keys and values simultaneously. Use `del dict[key]` to remove entries when the key is known to exist, and only re-assign values if they have actually changed (e.g., `len(new_val) != len(old_val)`).
+
+## 2024-11-20 - Cache JWT verification
+**Learning:** Decoding and verifying JWT signatures using `python-jose` or similar libraries involves CPU-intensive cryptographic operations. Running this validation on every single request for an active token significantly bottlenecks API performance.
+**Action:** Use `functools.lru_cache` to cache the successful decode results. To ensure security, explicitly disable the internal time validation (`verify_exp=False`) in the cached call, and perform a manual expiration timestamp (`exp`) comparison against the current UTC time to prevent caching expired token states.
