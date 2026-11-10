@@ -7,6 +7,7 @@ and role-based access control (RBAC) guard factories.
 from datetime import datetime, timedelta, timezone
 import uuid
 from typing import Optional
+from functools import lru_cache
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import logging
@@ -60,16 +61,34 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
+# ⚡ Bolt Optimization: Cache JWT verification to avoid redundant expensive crypto operations
+# on every request. We disable internal expiration verification (verify_exp=False) so we can
+# cache the decoded payload and manually enforce expiration against current time.
+@lru_cache(maxsize=1024)
+def _decode_jwt_cached(token: str, secret_key: str, algorithm: str) -> dict:
+    return jwt.decode(
+        token,
+        secret_key,
+        algorithms=[algorithm],
+        options={"require_exp": True, "require_sub": True, "verify_exp": False}
+    )
+
 def decode_access_token(token: str) -> TokenData:
     """Decodes and verifies a JWT token's signature and expiration."""
     try:
         # Require 'exp' and 'sub' claims to prevent perpetual non-expiring tokens
-        payload = jwt.decode(
+        payload = _decode_jwt_cached(
             token,
             settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM],
-            options={"require_exp": True, "require_sub": True}
+            settings.JWT_ALGORITHM
         )
+
+        # ⚡ Bolt Optimization: Manually enforce expiration to prevent caching expired token states
+        exp = payload.get("exp")
+        now = datetime.now(timezone.utc).timestamp()
+        if exp is not None and now > exp:
+            raise JWTError("Token expired")
+
         username: str = payload.get("sub")
         role: str = payload.get("role")
         if username is None:
