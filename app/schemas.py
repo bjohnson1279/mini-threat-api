@@ -1,3 +1,9 @@
+"""
+Pydantic validation schemas for the Threat Intelligence service.
+Defines request and response data models, input sanitization validators,
+polymorphic observable validation, and authentication token schemas.
+"""
+
 from datetime import datetime
 import ipaddress
 import re
@@ -22,10 +28,8 @@ class IOCBase(BaseModel):
     description: Optional[str] = Field(None, max_length=500, json_schema_extra={"example": "Associated with BlackCat ransomware campaign"})
     is_active: bool = Field(default=True, description="Whether indicator is currently active")
 
-# ⚡ Bolt Optimization: Pre-compile regular expressions for Pydantic validation.
-# Extracting inline regular expressions into module-level compiled constants prevents
-# redundant regex compilation and internal cache lookups on every request,
-# improving per-request validation performance for high-throughput endpoints.
+# ⚡ Bolt Optimization: Pre-compile regular expressions to prevent
+# redundant compilation and cache lookups during high-throughput validation.
 SHA256_REGEX = re.compile(r"^[A-Fa-f0-9]{64}\Z")
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\Z")
 DOMAIN_REGEX = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z")
@@ -42,14 +46,12 @@ class IOCCreate(IOCBase):
             return html.escape(v)
         return v
 
-    # ⚡ Bolt Optimization: Moved validation from IOCBase to IOCCreate
-    # Moving this expensive `@model_validator` out of `IOCBase` ensures that we don't
-    # re-validate data coming OUT of the database during serialization (in `IOCResponse`),
-    # which is already trusted. This significantly reduces response overhead for endpoints like `GET /iocs`.
+    # ⚡ Bolt Optimization: Validating on IOCCreate rather than IOCBase avoids
+    # redundant re-validation when serializing trusted database records in IOCResponse.
     @model_validator(mode='after')
     def validate_indicator_value(self):
-        # 🛡️ Sentinel Security Fix: Implement strict input validation on indicator_value
-        # depending on indicator_type to prevent malformed data injection.
+        # 🛡️ Sentinel Security Fix: Enforce strict format validation per indicator_type
+        # to prevent malformed data injection into the threat database.
         if self.indicator_type == "ipv4":
             try:
                 ipaddress.IPv4Address(self.indicator_value)

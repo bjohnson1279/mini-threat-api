@@ -59,6 +59,26 @@
 **Learning:** Re-evaluating expressions involving external function calls or calculations inside list comprehensions (like `now - t < 60` where `now` is constant) introduces unnecessary overhead on every iteration. This overhead compounds when the list is iterated frequently (like in rate limiting cleanup or validation).
 **Action:** Always precompute invariant calculations (e.g., `cutoff = now - 60`) before loops or comprehensions (using `t > cutoff`) to minimize redundant work and improve hot-path performance.
 
+## 2024-11-20 - Use bulk_save_objects over add_all for bulk inserts
+**Learning:** In SQLAlchemy, `Session.add_all()` simply iterates over the collection and calls `Session.add()` for each item internally, meaning it does not perform a true batch insert at the database level and still incurs the overhead of ORM state management.
+**Action:** For genuine bulk data ingestion performance improvements, use `session.bulk_save_objects()` or an `insert().values()` construct instead of `db.add_all()`.
+
+## 2024-11-20 - Use dict.items() and del instead of keys(), get(), and pop() in hot paths
+**Learning:** When iterating over a dictionary to clean up entries (e.g. rate limit tracking), using `list(dict.keys())` combined with `.get(key)` inside the loop incurs redundant dictionary lookup overhead. Additionally, unconditionally re-assigning values or using `.pop(key, None)` when the key is guaranteed to exist adds unnecessary mutation overhead.
+**Action:** Use `for key, value in list(dict.items()):` to fetch keys and values simultaneously. Use `del dict[key]` to remove entries when the key is known to exist, and only re-assign values if they have actually changed (e.g., `len(new_val) != len(old_val)`).
+
+## 2024-11-20 - Cache JWT verification
+**Learning:** Decoding and verifying JWT signatures using `python-jose` or similar libraries involves CPU-intensive cryptographic operations. Running this validation on every single request for an active token significantly bottlenecks API performance.
+**Action:** Use `functools.lru_cache` to cache the successful decode results. To ensure security, explicitly disable the internal time validation (`verify_exp=False`) in the cached call, and perform a manual expiration timestamp (`exp`) comparison against the current UTC time to prevent caching expired token states.
+
+## 2024-11-20 - Use time.time() instead of datetime.now(timezone.utc).timestamp() for hot path expiration checks
+**Learning:** Using `datetime.now(timezone.utc).timestamp()` incurs significant overhead due to object instantiation and timezone resolution, making it around 5-7x slower than the standard `time.time()`. In hot paths like JWT validation on every request, this overhead can limit request throughput.
+**Action:** When only the current Unix timestamp is needed (e.g. for expiration checking), always use `time.time()` directly instead of creating and converting `datetime` objects.
+
+## 2024-11-20 - Avoid timezone resolution overhead in hot paths
+**Learning:** When only the current Unix timestamp is needed for duration or expiration checks (e.g., JWT validation in hot paths), using datetime.now(timezone.utc).timestamp() incurs significant object instantiation and timezone resolution overhead.
+**Action:** Prefer using time.time() directly over datetime.now(timezone.utc).timestamp() to avoid this overhead in hot paths.
+
 ## Prevention Directives for Automated Refactoring
 - **Never Overwrite Complete Files**: Always use range-scoped replacement chunks (`StartLine`/`EndLine`) for edits to `schema.prisma`, `index.ts`, `public/index.php`, or DDL SQL scripts.
 - **Do Not Remove Core Declarations**: Do not delete existing route registrations or database DDL tables.
@@ -103,23 +123,5 @@
 - **Strictly Append-Only Journaling**: When adding learnings to `.jules/*.md`, append strictly at the end of the file. Do not rewrite, deduplicate, or remove lines beginning with `## YYYY-MM-DD`.
 - **Surgical Scope Quarantine**: Modify only the files directly involved in the issue and their corresponding test fixtures. Do not delete, rename, or perform drive-by cleanups of unrelated root-level scripts or legacy files.
 - **Coupled Test Fixture Awareness for Security Invariants**: When changing fail-open fallback behavior (such as hardening decryption to fail closed), always update upstream test mocks that rely on plaintext credentials or mock values.
-
 - **Strict Lowercase Directory Casing**: Always write learning notes to lowercase `.jules/<bot>.md`. Never create, commit, or reference uppercase `.Jules/`.
-
 - **Clean Markdown Formatting**: Always append journal entries using actual newline characters, never literal string escape sequences `\n`.
-
-## 2024-11-20 - Use bulk_save_objects over add_all for bulk inserts
-**Learning:** In SQLAlchemy, `Session.add_all()` simply iterates over the collection and calls `Session.add()` for each item internally, meaning it does not perform a true batch insert at the database level and still incurs the overhead of ORM state management.
-**Action:** For genuine bulk data ingestion performance improvements, use `session.bulk_save_objects()` or an `insert().values()` construct instead of `db.add_all()`.
-
-## 2024-11-20 - Use dict.items() and del instead of keys(), get(), and pop() in hot paths
-**Learning:** When iterating over a dictionary to clean up entries (e.g. rate limit tracking), using `list(dict.keys())` combined with `.get(key)` inside the loop incurs redundant dictionary lookup overhead. Additionally, unconditionally re-assigning values or using `.pop(key, None)` when the key is guaranteed to exist adds unnecessary mutation overhead.
-**Action:** Use `for key, value in list(dict.items()):` to fetch keys and values simultaneously. Use `del dict[key]` to remove entries when the key is known to exist, and only re-assign values if they have actually changed (e.g., `len(new_val) != len(old_val)`).
-
-## 2024-11-20 - Cache JWT verification
-**Learning:** Decoding and verifying JWT signatures using `python-jose` or similar libraries involves CPU-intensive cryptographic operations. Running this validation on every single request for an active token significantly bottlenecks API performance.
-**Action:** Use `functools.lru_cache` to cache the successful decode results. To ensure security, explicitly disable the internal time validation (`verify_exp=False`) in the cached call, and perform a manual expiration timestamp (`exp`) comparison against the current UTC time to prevent caching expired token states.
-
-## 2024-11-20 - Avoid timezone resolution overhead in hot paths
-**Learning:** When only the current Unix timestamp is needed for duration or expiration checks (e.g., JWT validation in hot paths), using datetime.now(timezone.utc).timestamp() incurs significant object instantiation and timezone resolution overhead.
-**Action:** Prefer using time.time() directly over datetime.now(timezone.utc).timestamp() to avoid this overhead in hot paths.

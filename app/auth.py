@@ -86,6 +86,8 @@ def decode_access_token(token: str) -> TokenData:
 
         # ⚡ Bolt Optimization: Manually enforce expiration to prevent caching expired token states
         exp = payload.get("exp")
+        # ⚡ Bolt Optimization: Use time.time() instead of datetime.now(timezone.utc).timestamp()
+        # to avoid the ~5x overhead of creating datetime objects and timezone resolution in the hot path.
         now = time.time()
         if exp is not None and now > exp:
             raise JWTError("Token expired")
