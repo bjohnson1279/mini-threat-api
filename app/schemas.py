@@ -1,6 +1,7 @@
 """
-Pydantic validation and serialization schemas for Mini Threat-Intel API.
-Defines request/response models and input validation rules for IOCs and authentication.
+Pydantic validation schemas for the Threat Intelligence service.
+Defines request and response data models, input sanitization validators,
+polymorphic observable validation, and authentication token schemas.
 """
 
 from datetime import datetime
@@ -27,7 +28,8 @@ class IOCBase(BaseModel):
     description: Optional[str] = Field(None, max_length=500, json_schema_extra={"example": "Associated with BlackCat ransomware campaign"})
     is_active: bool = Field(default=True, description="Whether indicator is currently active")
 
-# ⚡ Bolt Optimization: Pre-compile regex constants to avoid cache lookups per request.
+# ⚡ Bolt Optimization: Pre-compile regular expressions to prevent
+# redundant compilation and cache lookups during high-throughput validation.
 SHA256_REGEX = re.compile(r"^[A-Fa-f0-9]{64}\Z")
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\Z")
 DOMAIN_REGEX = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z")
@@ -44,10 +46,12 @@ class IOCCreate(IOCBase):
             return html.escape(v)
         return v
 
-    # ⚡ Bolt: Validating on IOCCreate avoids re-validating trusted DB data during serialization.
+    # ⚡ Bolt Optimization: Validating on IOCCreate rather than IOCBase avoids
+    # redundant re-validation when serializing trusted database records in IOCResponse.
     @model_validator(mode='after')
     def validate_indicator_value(self):
-        # 🛡️ Sentinel Security Fix: Validate indicator_value against indicator_type format.
+        # 🛡️ Sentinel Security Fix: Enforce strict format validation per indicator_type
+        # to prevent malformed data injection into the threat database.
         if self.indicator_type == "ipv4":
             try:
                 ipaddress.IPv4Address(self.indicator_value)
