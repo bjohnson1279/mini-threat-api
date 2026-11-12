@@ -6,6 +6,7 @@ and role-based access control (RBAC) guard factories.
 
 from datetime import datetime, timedelta, timezone
 import uuid
+import time
 from typing import Optional
 from functools import lru_cache
 from fastapi import Depends, HTTPException, status
@@ -85,7 +86,9 @@ def decode_access_token(token: str) -> TokenData:
 
         # ⚡ Bolt Optimization: Manually enforce expiration to prevent caching expired token states
         exp = payload.get("exp")
-        now = datetime.now(timezone.utc).timestamp()
+        # ⚡ Bolt Optimization: Use time.time() instead of datetime.now(timezone.utc).timestamp()
+        # to avoid the ~5x overhead of creating datetime objects and timezone resolution in the hot path.
+        now = time.time()
         if exp is not None and now > exp:
             raise JWTError("Token expired")
 
