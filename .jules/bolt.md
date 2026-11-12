@@ -119,3 +119,7 @@
 ## 2024-11-20 - Cache JWT verification
 **Learning:** Decoding and verifying JWT signatures using `python-jose` or similar libraries involves CPU-intensive cryptographic operations. Running this validation on every single request for an active token significantly bottlenecks API performance.
 **Action:** Use `functools.lru_cache` to cache the successful decode results. To ensure security, explicitly disable the internal time validation (`verify_exp=False`) in the cached call, and perform a manual expiration timestamp (`exp`) comparison against the current UTC time to prevent caching expired token states.
+
+## 2024-11-20 - Avoid timezone resolution overhead in hot paths
+**Learning:** When only the current Unix timestamp is needed for duration or expiration checks (e.g., JWT validation in hot paths), using datetime.now(timezone.utc).timestamp() incurs significant object instantiation and timezone resolution overhead.
+**Action:** Prefer using time.time() directly over datetime.now(timezone.utc).timestamp() to avoid this overhead in hot paths.
